@@ -1512,7 +1512,7 @@ namespace VideoTools
             if (openFileDialog.ShowDialog() == true)
             {
                 string sFFmpegSaveFolder = IOPath.GetDirectoryName(openFileDialog.FileName);
-                string fileUrl = "https://gitee.com/zyqwxh/ffmpeg/releases/download/7.1.1/ffmpeg.exe";
+                string fileUrl = "https://gitee.com/is-zhou/ffmpeg/releases/download/7.1.1/ffmpeg.exe";
                 string fileName = IOPath.GetFileName(fileUrl);
                 string filePath = IOPath.Combine(sFFmpegSaveFolder, fileName);
 
