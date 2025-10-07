@@ -902,7 +902,7 @@ namespace VideoTools
                     sCmd += "\" ";
                     break;
                 case "multiple":
-                    sCmd += $" -vf \"setpts=PTS";
+                    var sd = " -filter_complex \"[0:v]setpts={0}*PTS[v];[0:a]atempo={1}[a]\" -map \"[v]\" -map \"[a]\" -crf 0";
                     if (double.TryParse(textBoxMultiple.Text, out double value))
                     {
                         // 检查范围并生成对应的操作符和数值
@@ -921,9 +921,9 @@ namespace VideoTools
                             result = "*1";
                         }
 
-                        sCmd += result;
+                         sCmd += string.Format(sd, (1.0 / value).ToString("0.##"), value.ToString("#.##"));
                     }
-                    sCmd += "\" -an ";
+                    // sCmd += "\" -an ";
                     break;
                 case "voice":
                     if (true == radiobtnVoiceExtract.IsChecked)
