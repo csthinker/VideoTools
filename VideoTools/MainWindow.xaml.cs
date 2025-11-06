@@ -923,28 +923,102 @@ namespace VideoTools
                     sCmd += "\" ";
                     break;
                 case "multiple":
-                    var sd = " -filter_complex \"[0:v]setpts={0}*PTS[v];[0:a]atempo={1}[a]\" -map \"[v]\" -map \"[a]\" -crf 0";
-                    if (double.TryParse(textBoxMultiple.Text, out double value))
+                    if (double.TryParse(textBoxMultiple.Text, out double value) && value > 0)
                     {
-                        // 检查范围并生成对应的操作符和数值
-                        string result = "";
-                        if (value >= 0.1 && value <= 1)
+                        double ptsFactor = 1.0 / value;
+                        if (true == checkBox_Multiple_AccelerateAudio.IsChecked)
                         {
-                            double multiplier = 1 / value; // 计算乘法因子
-                            result = $"*{multiplier:F1}"; // 保留两位小数
-                        }
-                        else if (value >= 1.1 && value <= 10)
-                        {
-                            result = $"/{value:F1}"; // 保留两位小数
+                            // 构建 atempo 链，确保每段在 [0.5, 2.0] 范围内
+                            var atempos = new System.Collections.Generic.List<double>();
+                            double remaining = value;
+                            const double EPS = 1e-6;
+                            if (remaining >= 1.0)
+                            {
+                                while (remaining > 2.0 + EPS)
+                                {
+                                    atempos.Add(2.0);
+                                    remaining /= 2.0;
+                                }
+                                atempos.Add(remaining);
+                            }
+                            else
+                            {
+                                while (remaining < 0.5 - EPS)
+                                {
+                                    atempos.Add(0.5);
+                                    remaining /= 0.5;
+                                }
+                                atempos.Add(remaining);
+                            }
+                            string audioChain = string.Join(",", atempos.Select(v => $"atempo={v:0.###}"));
+                            sCmd += $" -filter_complex \"[0:v]setpts={ptsFactor:0.##}*PTS[v];[0:a]{audioChain}[a]\" -map \"[v]\" -map \"[a]\" ";
+                            // 指定视频/音频编码与压缩参数，避免默认编码体积暴涨
+                            sCmd += sOutVideoCode;
+                            sCmd += sCompressFormat; /* crf 或 bv */
+                            sCmd += " -preset medium ";
+                            // 根据容器选择合适的音频编码
+                            string extLower = extension.ToLower();
+                            if (extLower == ".webm")
+                            {
+                                sCmd += " -c:a libopus ";
+                            }
+                            else if (extLower == ".ogv")
+                            {
+                                sCmd += " -c:a libvorbis ";
+                            }
+                            else if (extLower == ".avi" || extLower == ".mpg" || extLower == ".mpeg")
+                            {
+                                sCmd += " -c:a libmp3lame ";
+                            }
+                            else
+                            {
+                                sCmd += " -c:a aac ";
+                            }
                         }
                         else
                         {
-                            result = "*1";
+                            // 仅加速视频，关闭音频
+                            sCmd += $" -vf \"setpts={ptsFactor:0.##}*PTS\" -an ";
+                            sCmd += sOutVideoCode;
+                            sCmd += sCompressFormat; /* crf 或 bv */
+                            sCmd += " -preset medium ";
                         }
-
-                        sCmd += string.Format(sd, (1.0 / value).ToString("0.##"), value.ToString("#.##"));
                     }
-                    // sCmd += "\" -an ";
+                    else
+                    {
+                        // 非法或缺省倍速值时的兜底
+                        if (true == checkBox_Multiple_AccelerateAudio.IsChecked)
+                        {
+                            sCmd += " -filter_complex \"[0:v]setpts=PTS[v];[0:a]atempo=1.0[a]\" -map \"[v]\" -map \"[a]\" ";
+                            sCmd += sOutVideoCode;
+                            sCmd += sCompressFormat; /* crf 或 bv */
+                            sCmd += " -preset medium ";
+                            string extLower2 = extension.ToLower();
+                            if (extLower2 == ".webm")
+                            {
+                                sCmd += " -c:a libopus ";
+                            }
+                            else if (extLower2 == ".ogv")
+                            {
+                                sCmd += " -c:a libvorbis ";
+                            }
+                            else if (extLower2 == ".avi" || extLower2 == ".mpg" || extLower2 == ".mpeg")
+                            {
+                                sCmd += " -c:a libmp3lame ";
+                            }
+                            else
+                            {
+                                sCmd += " -c:a aac ";
+                            }
+                        }
+                        else
+                        {
+                            sCmd += " -vf \"setpts=PTS\" -an ";
+                            sCmd += sOutVideoCode;
+                            sCmd += sCompressFormat; /* crf 或 bv */
+                            sCmd += " -preset medium ";
+                        }
+                    }
                     break;
                 case "voice":
                     if (true == radiobtnVoiceExtract.IsChecked)

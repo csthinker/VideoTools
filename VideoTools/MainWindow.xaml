@@ -1041,6 +1041,13 @@
                     Height="20" Margin="479,72,0,0" TextWrapping="Wrap" 
                     Text="1.5" VerticalAlignment="Top" 
                     Width="44" FontSize="14" TextAlignment="Center"/>
+                <CheckBox x:Name="checkBox_Multiple_AccelerateAudio" Content="加速音频"
+                          HorizontalAlignment="Left" Margin="27,110,0,0" VerticalAlignment="Top"
+                          FontSize="14" IsChecked="False">
+                    <CheckBox.ToolTip>
+                        <ToolTip>勾选后同时加速音频（超出0.5-2倍会自动链式处理）。默认不勾选则关闭音频。</ToolTip>
+                    </CheckBox.ToolTip>
+                </CheckBox>
                 <Button Content="开始处理" Style="{StaticResource ModernButtonStyle}"
                     HorizontalAlignment="Left" Margin="485,195,0,0" VerticalAlignment="Top" Width="100" Height="36"
                     RenderTransformOrigin="0.12,0.579"
