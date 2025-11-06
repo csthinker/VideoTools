@@ -889,6 +889,48 @@ namespace VideoTools
                 sCompressFormat += sCrf;
             }
 
+            /* 如果是压缩任务，完善输出文件名后缀，便于比较压缩效果 */
+            if (sToolChoose == "compress")
+            {
+                string codecLabel = "video";
+                string lowerCode = sOutVideoCode.ToLower();
+                if (lowerCode.Contains("h264") || lowerCode.Contains("libx264"))
+                {
+                    codecLabel = "h264";
+                }
+                else if (lowerCode.Contains("hevc") || lowerCode.Contains("libx265") || lowerCode.Contains("x265"))
+                {
+                    codecLabel = "h265";
+                }
+                else if (lowerCode.Contains("av1"))
+                {
+                    codecLabel = "av1";
+                }
+                else if (lowerCode.Contains("mpeg4"))
+                {
+                    codecLabel = "mpeg4";
+                }
+
+                string hwLabel = (true == checkBox_Setting_GpuUse.IsChecked) ?
+                    (lowerCode.Contains("nvenc") ? "nvenc" : (lowerCode.Contains("qsv") ? "qsv" : (lowerCode.Contains("amf") ? "amf" : "gpu")))
+                    : "cpu";
+
+                string paramLabel;
+                if (sCompressFormat.StartsWith(" -b:v "))
+                {
+                    string bv = sCompressFormat.Replace(" -b:v ", string.Empty).Trim(); // 形如 "4.50M"
+                    paramLabel = $"bv{bv}";
+                }
+                else
+                {
+                    paramLabel = $"crf{sCrf}";
+                }
+
+                suffix = $"_compress_{codecLabel}_{hwLabel}_{paramLabel}_" + formattedTime;
+                newFileName = $"{fileName}{suffix}{extension}";
+                destinationPath = IOPath.Combine(targetFolder, newFileName);
+            }
+
             switch (sToolChoose)
             {
                 case "compress":
