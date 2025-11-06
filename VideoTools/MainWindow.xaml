@@ -445,6 +445,246 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <!-- 添加双端进度条样式（基础版，保留） -->
+        <Style x:Key="ModernRangeSliderStyle" TargetType="{x:Type Slider}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Slider}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto" MinHeight="{TemplateBinding MinHeight}"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Track x:Name="PART_Track" Grid.Row="1">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                        <RepeatButton.Style>
+                                            <Style TargetType="{x:Type RepeatButton}">
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                            <Border Height="4" CornerRadius="2" 
+                                                                Background="#2196F3"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </RepeatButton.Style>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
+                                        <RepeatButton.Style>
+                                            <Style TargetType="{x:Type RepeatButton}">
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                            <Border Height="4" CornerRadius="2"
+                                                                Background="#E0E0E0"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </RepeatButton.Style>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Style>
+                                            <Style TargetType="{x:Type Thumb}">
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type Thumb}">
+                                                            <Grid>
+                                                                <Ellipse Width="16" Height="16" Fill="White">
+                                                                    <Ellipse.Effect>
+                                                                        <DropShadowEffect BlurRadius="4" ShadowDepth="1" 
+                                                                                    Opacity="0.25"/>
+                                                                    </Ellipse.Effect>
+                                                                </Ellipse>
+                                                                <Ellipse Width="16" Height="16" 
+                                                                     Stroke="#2196F3" StrokeThickness="2"/>
+                                                            </Grid>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Thumb.Style>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 双端进度条：起点滑块样式（左侧灰、右侧蓝） -->
+        <Style x:Key="ModernRangeStartSliderStyle" TargetType="{x:Type Slider}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Slider}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto" MinHeight="{TemplateBinding MinHeight}"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Track x:Name="PART_Track" Grid.Row="1">
+                                <!-- 左侧（Decrease）灰色 -->
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                        <RepeatButton.Style>
+                                            <Style TargetType="{x:Type RepeatButton}">
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                            <Border Height="4" CornerRadius="2" Background="#E0E0E0"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </RepeatButton.Style>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <!-- 右侧（Increase）蓝色 -->
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
+                                        <RepeatButton.Style>
+                                            <Style TargetType="{x:Type RepeatButton}">
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                            <Border Height="4" CornerRadius="2" Background="#2196F3"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </RepeatButton.Style>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Style>
+                                            <Style TargetType="{x:Type Thumb}">
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type Thumb}">
+                                                            <Grid>
+                                                                <Ellipse Width="16" Height="16" Fill="White">
+                                                                    <Ellipse.Effect>
+                                                                        <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.25"/>
+                                                                    </Ellipse.Effect>
+                                                                </Ellipse>
+                                                                <Ellipse Width="16" Height="16" Stroke="#2196F3" StrokeThickness="2"/>
+                                                            </Grid>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Thumb.Style>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 双端进度条：终点滑块样式（左侧透明、右侧灰） -->
+        <Style x:Key="ModernRangeEndSliderStyle" TargetType="{x:Type Slider}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Slider}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto" MinHeight="{TemplateBinding MinHeight}"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Track x:Name="PART_Track" Grid.Row="1">
+                                <!-- 左侧（Decrease）透明，让起点滑块的蓝色区间透出 -->
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                                        <RepeatButton.Style>
+                                            <Style TargetType="{x:Type RepeatButton}">
+                                                <!-- 关键：禁用命中测试，避免覆盖下层起点滑块的拇指点击 -->
+                                                <Setter Property="IsHitTestVisible" Value="False"/>
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                            <Border Height="4" CornerRadius="2" Background="Transparent"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </RepeatButton.Style>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <!-- 右侧（Increase）灰色，用来遮住超出终点的蓝色部分 -->
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
+                                        <RepeatButton.Style>
+                                            <Style TargetType="{x:Type RepeatButton}">
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                            <Border Height="4" CornerRadius="2" Background="#E0E0E0"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </RepeatButton.Style>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Style>
+                                            <Style TargetType="{x:Type Thumb}">
+                                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                                <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="{x:Type Thumb}">
+                                                            <Grid>
+                                                                <Ellipse Width="16" Height="16" Fill="White">
+                                                                    <Ellipse.Effect>
+                                                                        <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.25"/>
+                                                                    </Ellipse.Effect>
+                                                                </Ellipse>
+                                                                <Ellipse Width="16" Height="16" Stroke="#2196F3" StrokeThickness="2"/>
+                                                            </Grid>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Thumb.Style>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -485,6 +725,22 @@
                                             AncestorType={x:Type RadioButton}
                                         }
                                     }" />
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton Tag="cut" 
+                     Style="{DynamicResource RadioButtonStyle}" 
+                     Click="RadioBtn_Compress_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xe948;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
+                           Margin="10 0 0 0" Foreground="#1E1E1E"/>
+                        <TextBlock Margin="10 0 0 0" Text="视频裁剪"  FontSize="14" VerticalAlignment="Center" 
+                           Foreground="{Binding Foreground, RelativeSource={
+                                    RelativeSource FindAncestor,
+                                    AncestorLevel=1,
+                                    AncestorType={x:Type RadioButton}
+                                }
+                            }" />
                     </StackPanel>
                 </RadioButton>
 
@@ -574,7 +830,7 @@
         <!-- 视频下方配置窗口 -->
         <Grid Grid.Column="3" Background="#FAFAFA" Margin="0,0,2,0" Height="565" VerticalAlignment="Bottom">
             <!-- 视频压缩面板 -->
-            <Grid x:Name="compressPanel" Visibility="Collapsed" Margin="0,300,0,0">
+            <Grid x:Name="compressPanel" Visibility="Visible" Margin="0,300,0,0">
                 <Label Content="视频编码" HorizontalAlignment="Left" Margin="22,26,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.538,0.56" Width="98" FontSize="16"/>
                 <RadioButton Tag="radiobtn_compress_264" Content="H.264" HorizontalAlignment="Left" Margin="42,66,0,0" VerticalAlignment="Top" IsChecked="True" Click="RadioBtn_CompressChoose_Click" FontSize="16"/>
                 <RadioButton Tag="radiobtn_compress_265" Content="H.265" HorizontalAlignment="Left" Margin="121,66,0,0" VerticalAlignment="Top" Click="RadioBtn_CompressChoose_Click" FontSize="16"/>
@@ -591,6 +847,80 @@
                         HorizontalAlignment="Left" Margin="485,195,0,0" VerticalAlignment="Top" Width="100" Height="36" 
                         RenderTransformOrigin="0.12,0.579" 
                         Click="BtnProcess_Click"/>
+            </Grid>
+
+            <!-- 视频裁剪面板 -->
+            <Grid x:Name="cutPanel" Visibility="Collapsed" Margin="0,300,0,0">
+                <!-- 这里放裁剪相关的UI控件 -->
+                <!-- 添加区间选择进度条 -->
+                <Grid Margin="22,120,74,0" Height="30" VerticalAlignment="Top">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="365.71"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- 区间进度条 -->
+                    <!-- 开始位置滑块 -->
+                    <Slider x:Name="startPositionSlider" 
+                            Style="{StaticResource ModernRangeStartSliderStyle}"
+                            Minimum="0" Maximum="100" 
+                            Value="0"
+                            ValueChanged="StartPositionSlider_ValueChanged"
+                            Margin="0,0,0,0"/>
+
+                    <!-- 结束位置滑块 -->
+                    <Slider x:Name="endPositionSlider" 
+                            Style="{StaticResource ModernRangeEndSliderStyle}"
+                            Panel.ZIndex="1"
+                            Minimum="0" Maximum="100" 
+                            Value="100"
+                            ValueChanged="EndPositionSlider_ValueChanged"
+                            Margin="17,0,0,0" Grid.ColumnSpan="2" HorizontalAlignment="Left" Width="498"/>
+                </Grid>
+                <Label Content="开始位置" HorizontalAlignment="Left" Margin="20,53,0,0" VerticalAlignment="Top" Width="84" FontSize="16"/>
+                <Grid Style="{StaticResource TimeSpinnerStyle}" Margin="100,53,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="cut_start_time" 
+                        Text="00:00:00" 
+                        FontSize="14" 
+                        VerticalContentAlignment="Center"
+                        TextAlignment="Center"
+                        PreviewTextInput="TimeTextBox_PreviewTextInput"
+                        TextChanged="TimeTextBox_TextChanged"/>
+                    <StackPanel Grid.Column="1" Width="20">
+                        <RepeatButton Style="{StaticResource SpinButtonStyleUp}"
+                                Click="TimeSpinButton_Up_Click"/>
+                        <RepeatButton Style="{StaticResource SpinButtonStyleDown}"
+                                Click="TimeSpinButton_Down_Click"/>
+                    </StackPanel>
+                </Grid>
+                <Label Content="结束位置" HorizontalAlignment="Left" Margin="300,53,0,0" VerticalAlignment="Top" Width="84" FontSize="16"/>
+                <Grid Style="{StaticResource TimeSpinnerStyle}" Margin="380,53,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="cut_end_time" 
+                        Text="00:00:00" 
+                        FontSize="14" 
+                        VerticalContentAlignment="Center"
+                        TextAlignment="Center"
+                        PreviewTextInput="TimeTextBox_PreviewTextInput"
+                        TextChanged="TimeTextBox_TextChanged"/>
+                    <StackPanel Grid.Column="1" Width="20">
+                        <RepeatButton Style="{StaticResource SpinButtonStyleUp}"
+                            Click="TimeSpinButton_Up_Click"/>
+                        <RepeatButton Style="{StaticResource SpinButtonStyleDown}"
+                            Click="TimeSpinButton_Down_Click"/>
+                    </StackPanel>
+                </Grid>
+                <Button Content="开始处理" Style="{StaticResource ModernButtonStyle}"
+                    HorizontalAlignment="Left" Margin="485,195,0,0" VerticalAlignment="Top" Width="100" Height="36"
+                    RenderTransformOrigin="0.12,0.579"
+                    Click="BtnCut_Click"/>
+
             </Grid>
 
             <!-- 格式转换面板 -->
@@ -806,7 +1136,7 @@
                     <ComboBoxItem Content="AMD"/>
                 </ComboBox>
             </Grid>
-            
+
         </Grid>
 
         <!-- 视频播放窗口 -->

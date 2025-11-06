@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Linq;
@@ -294,7 +294,15 @@ namespace VideoTools
         private bool IsVideoFile(string filePath)
         {
             string ext = IOPath.GetExtension(filePath).ToLower();
-            return new[] { ".mp4", ".avi", ".wmv", ".mov", ".mkv" }.Contains(ext);
+            // 扩展支持的容器格式；预览可能受系统编解码器限制，但FFmpeg处理不受限
+            string[] supported = new[] {
+                ".mp4", ".avi", ".wmv", ".mov", ".mkv",
+                ".webm", ".flv", ".ts", ".m2ts", ".mts",
+                ".mpg", ".mpeg", ".m4v", ".3gp", ".3g2",
+                ".ogv", ".ogg", ".vob", ".asf", ".mxf",
+                ".rmvb", ".rm", ".y4m"
+            };
+            return supported.Contains(ext);
         }
 
         /* 全局: 初始化定时器 */
@@ -342,7 +350,7 @@ namespace VideoTools
         {
             var openFileDialog = new OpenFileDialog
             {
-                Filter = "视频文件|*.mp4;*.avi;*.wmv;*.mov;*.mkv|所有文件|*.*"
+                Filter = "视频文件|*.mp4;*.avi;*.wmv;*.mov;*.mkv;*.webm;*.flv;*.ts;*.m2ts;*.mts;*.mpg;*.mpeg;*.m4v;*.3gp;*.3g2;*.ogv;*.vob;*.asf;*.mxf;*.rmvb;*.rm;*.y4m|所有文件|*.*"
             };
 
             if (openFileDialog.ShowDialog() == true)
@@ -528,6 +536,14 @@ namespace VideoTools
             {
                 baseBitrate = CalculateBaseBitrate(videoHeight);
                 progressSlider.Maximum = mediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+                /* 导入后初始化裁剪范围与文本框 */
+                cut_start_time.Text = "00:00:00";
+                cut_end_time.Text = mediaPlayer.NaturalDuration.TimeSpan.ToString(@"hh\:mm\:ss");
+                startPositionSlider.Value = 0;
+                endPositionSlider.Value = 100;
+                /* 同步 GIF 文本框默认值（便于其它功能） */
+                if (txtStartTime != null) txtStartTime.Text = "00:00:00";
+                if (txtEndTime != null) txtEndTime.Text = cut_end_time.Text;
                 uiTimer.Start();
             }
         }
@@ -535,10 +551,9 @@ namespace VideoTools
         /* 视频窗口: 视频加载失败 */
         private void MediaElement_MediaFailed(object sender, ExceptionRoutedEventArgs e)
         {
-            MessageBox.Show($"视频加载失败: {e.ErrorException.Message}");
-            // 恢复叠加层显示
+            MessageBox.Show($"视频预览失败，但仍可使用FFmpeg进行处理。\n原因: {e.ErrorException.Message}");
+            // 恢复叠加层显示（预览不可用），但不清空路径，以便压缩/转换等功能继续工作
             overlayGrid.Visibility = Visibility.Visible;
-            sVideoFilePath = "";
         }
 
         /* 视频窗口: 视频播放结束 */
@@ -769,22 +784,8 @@ namespace VideoTools
             parseCompressVideoCode();
             parseConvertVideoCode();
 
-            if (true == checkBox_Setting_GpuUse.IsChecked) {
-                switch (comboBox_Setting_GpuSelect.SelectedIndex) {
-                    case 0:
-                        sCmd += " -hwaccel qsv ";
-                        break;
-                    case 1:
-                        sCmd += " -hwaccel cuda ";
-                        break;
-                    case 2:
-                        sCmd += " -hwaccel amf ";
-                        break;
-                    default:
-                        sCmd += " -hwaccel qsv ";
-                        break;
-                }
-            }
+            /* 解码端不强制硬件加速，避免部分视频或驱动不兼容导致失败。
+             * 保留（下方）编码端的 GPU 选择以获取性能。*/
 
             if (true == checkBox_Setting_CpuMax.IsChecked)
             {
@@ -798,7 +799,7 @@ namespace VideoTools
             }
 
             sCmd += $"-i ";
-            sCmd += sVideoFilePath;
+            sCmd += $"\"{sVideoFilePath}\"";
 
             switch (sToolChoose)
             {
@@ -813,6 +814,10 @@ namespace VideoTools
                 case "gif":
                     suffix = "_gif_" + formattedTime;
                     extension = $".gif";
+                    break;
+                case "cut":
+                    suffix = "_cut_" + formattedTime;
+                    extension = IOPath.GetExtension(sVideoFilePath);
                     break;
                 case "resize":
                     suffix = "_resize_" + textBox_Size_Width.Text.ToString() + "x" + textBox_Size_Height.Text.ToString() + "_" + formattedTime;
@@ -849,7 +854,9 @@ namespace VideoTools
             if (true == checkBox_Setting_GpuUse.IsChecked)
             {
                 sCompressFormat = $" -b:v ";
-                double targetBitrate = baseBitrate * Math.Pow(2, (25 - double.Parse(sCrf)) / 6.0) * 0.4;
+                /* 当未能获取视频高度时（预览失败），回退一个合理的基准比特率以避免0M导致编码失败 */
+                double baseForCalc = baseBitrate > 0 ? baseBitrate : 5.0; // 默认按1080p基准
+                double targetBitrate = baseForCalc * Math.Pow(2, (25 - double.Parse(sCrf)) / 6.0) * 0.4;
                 sCompressFormat += targetBitrate.ToString("F2");
                 sCompressFormat += "M";
             }
@@ -893,6 +900,20 @@ namespace VideoTools
                         sCmd += $":-1:flags=lanczos\" -an -loop ";
                     }
                     sCmd += (true == checkBox_Gif_Loop.IsChecked) ? "0" : "1";
+                    break;
+                case "cut":
+                    int cutRangeSeconds = GetCutTimeRangeInSeconds();
+                    if (cutRangeSeconds <= 0)
+                    {
+                        sOutDir = "";
+                        sOutFilePath = "";
+                        return ""; /* 无效区间 */
+                    }
+                    sCmd += " -ss ";
+                    sCmd += cut_start_time.Text.ToString();
+                    sCmd += " -t ";
+                    sCmd += cutRangeSeconds.ToString();
+                    sCmd += " -c copy ";
                     break;
                 case "resize":
                     sCmd += $" -vf \"scale=";
@@ -948,9 +969,8 @@ namespace VideoTools
                 sCmd += " ";
             }
 
-            /* 输出文件路径 */
-            sCmd += $" ";
-            sCmd += destinationPath;
+            /* 输出文件路径（需加引号以支持含空格路径） */
+            sCmd += $" \"{destinationPath}\"";
 
             sOutDir = targetFolder;
             sOutFilePath = destinationPath;
@@ -1059,7 +1079,8 @@ namespace VideoTools
                         sConvertVideoCode = $" -c:v h264_{sCodeGpuSelect} -c:a aac ";
                         break;
                     case ".avi":
-                        sConvertVideoCode = $" -c:v av1_{sCodeGpuSelect} -c:a libmp3lame ";
+                        /* AVI容器更常见的是MPEG-4 + MP3，避免使用可能不可用的AV1硬件编码器 */
+                        sConvertVideoCode = $" -c:v mpeg4 -c:a libmp3lame ";
                         break;
                     case ".mkv":
                         sConvertVideoCode = $" -c:v h264_{sCodeGpuSelect} -c:a copy ";
@@ -1097,6 +1118,56 @@ namespace VideoTools
                     default:
                         sConvertVideoCode = $" -c:v libx264 -c:a aac ";
                         break;
+                }
+            }
+        }
+
+        /* 裁剪：裁剪按钮事件 */
+        private void BtnCut_Click(object sender, RoutedEventArgs e)
+        {
+            /* 统一走全局处理流程，但明确设置工具类型为 cut */
+            sToolChoose = "cut";
+            BtnProcess_Click(sender, e);
+        }
+
+        /* 裁剪：开始时间输入框事件 */
+        private void StartPositionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (isInited && mediaPlayer.NaturalDuration.HasTimeSpan)
+            {
+                double totalSeconds = mediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+                double currentSeconds = (startPositionSlider.Value / 100.0) * totalSeconds;
+                TimeSpan currentPosition = TimeSpan.FromSeconds(currentSeconds);
+
+                // 确保开始时间不会超过结束时间
+                if (currentPosition.TotalSeconds < TimeSpan.Parse(cut_end_time.Text).TotalSeconds)
+                {
+                    cut_start_time.Text = currentPosition.ToString(@"hh\:mm\:ss");
+                }
+                else
+                {
+                    startPositionSlider.Value = e.OldValue;
+                }
+            }
+        }
+
+        /* 裁剪：结束时间输入框事件 */
+        private void EndPositionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (isInited && mediaPlayer.NaturalDuration.HasTimeSpan)
+            {
+                double totalSeconds = mediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+                double currentSeconds = (endPositionSlider.Value / 100.0) * totalSeconds;
+                TimeSpan currentPosition = TimeSpan.FromSeconds(currentSeconds);
+
+                // 确保结束时间不会小于开始时间
+                if (currentPosition.TotalSeconds > TimeSpan.Parse(cut_start_time.Text).TotalSeconds)
+                {
+                    cut_end_time.Text = currentPosition.ToString(@"hh\:mm\:ss");
+                }
+                else
+                {
+                    endPositionSlider.Value = e.OldValue;
                 }
             }
         }
@@ -1139,15 +1210,44 @@ namespace VideoTools
         }
         private void ValidateTimeRange()
         {
-            if (txtStartTime == null || txtEndTime == null) return;
+            /* GIF 文本框校验 */
+            if (txtStartTime != null && txtEndTime != null)
+            {
+                TimeSpan startTime, endTime;
+                if (TimeSpan.TryParse(txtStartTime.Text, out startTime) &&
+                    TimeSpan.TryParse(txtEndTime.Text, out endTime))
+                {
+                    if (endTime < startTime)
+                    {
+                        txtEndTime.Text = txtStartTime.Text;
+                    }
+                }
+            }
+
+            /* 裁剪文本框校验 */
+            ValidateCutTimeRange();
+        }
+
+        private void ValidateCutTimeRange()
+        {
+            if (!isInited) return;
+            if (cut_start_time == null || cut_end_time == null) return;
+            if (mediaPlayer == null) return;
 
             TimeSpan startTime, endTime;
-            if (TimeSpan.TryParse(txtStartTime.Text, out startTime) &&
-                TimeSpan.TryParse(txtEndTime.Text, out endTime))
+            if (TimeSpan.TryParse(cut_start_time.Text, out startTime) &&
+                TimeSpan.TryParse(cut_end_time.Text, out endTime))
             {
+                if (mediaPlayer.NaturalDuration.HasTimeSpan)
+                {
+                    var duration = mediaPlayer.NaturalDuration.TimeSpan;
+                    if (startTime > duration) startTime = duration;
+                    if (endTime > duration) endTime = duration;
+                }
+
                 if (endTime < startTime)
                 {
-                    txtEndTime.Text = txtStartTime.Text;
+                    cut_end_time.Text = cut_start_time.Text;
                 }
             }
         }
@@ -1169,6 +1269,12 @@ namespace VideoTools
 
             // 验证开始时间和结束时间
             ValidateTimeRange();
+
+            // 如果是裁剪文本框，联动更新区间滑块
+            if (textBox == cut_start_time || textBox == cut_end_time)
+            {
+                SyncCutSlidersFromTextBoxes();
+            }
         }
 
         /* GIF: 获取起始位置和结束位置相差秒数 */
@@ -1211,25 +1317,33 @@ namespace VideoTools
                     currentTime = TimeSpan.Zero;
 
                 // 如果是开始时间，确保不大于结束时间
-                if (textBox == txtStartTime)
+                if (textBox == txtStartTime || textBox == cut_start_time)
                 {
                     TimeSpan endTime;
-                    if (TimeSpan.TryParse(txtEndTime.Text, out endTime) && currentTime > endTime)
+                    var endText = (textBox == txtStartTime) ? txtEndTime.Text : cut_end_time.Text;
+                    if (TimeSpan.TryParse(endText, out endTime) && currentTime > endTime)
                     {
                         currentTime = endTime;
                     }
                 }
                 // 如果是结束时间，确保不小于开始时间
-                else if (textBox == txtEndTime)
+                else if (textBox == txtEndTime || textBox == cut_end_time)
                 {
                     TimeSpan startTime;
-                    if (TimeSpan.TryParse(txtStartTime.Text, out startTime) && currentTime < startTime)
+                    var startText = (textBox == txtEndTime) ? txtStartTime.Text : cut_start_time.Text;
+                    if (TimeSpan.TryParse(startText, out startTime) && currentTime < startTime)
                     {
                         currentTime = startTime;
                     }
                 }
 
                 textBox.Text = currentTime.ToString(@"hh\:mm\:ss");
+
+                // 裁剪文本框变更后联动滑块
+                if (textBox == cut_start_time || textBox == cut_end_time)
+                {
+                    SyncCutSlidersFromTextBoxes();
+                }
             }
         }
 
@@ -1253,7 +1367,51 @@ namespace VideoTools
                     currentTime = TimeSpan.Zero;
 
                 textBox.Text = currentTime.ToString(@"hh\:mm\:ss");
+
+                // 裁剪文本框变更后联动滑块
+                if (textBox == cut_start_time || textBox == cut_end_time)
+                {
+                    SyncCutSlidersFromTextBoxes();
+                }
             }
+        }
+
+        /* 裁剪: 根据文本框同步区间滑块 */
+        private void SyncCutSlidersFromTextBoxes()
+        {
+            if (!isInited || !mediaPlayer.NaturalDuration.HasTimeSpan) return;
+
+            TimeSpan startTime, endTime;
+            if (TimeSpan.TryParse(cut_start_time.Text, out startTime) &&
+                TimeSpan.TryParse(cut_end_time.Text, out endTime))
+            {
+                var duration = mediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+                var startSeconds = Math.Max(0, Math.Min(duration, startTime.TotalSeconds));
+                var endSeconds = Math.Max(0, Math.Min(duration, endTime.TotalSeconds));
+
+                // 保证单调
+                if (endSeconds < startSeconds)
+                {
+                    endSeconds = startSeconds;
+                    cut_end_time.Text = TimeSpan.FromSeconds(endSeconds).ToString(@"hh\:mm\:ss");
+                }
+
+                startPositionSlider.Value = (startSeconds / duration) * 100.0;
+                endPositionSlider.Value = (endSeconds / duration) * 100.0;
+            }
+        }
+
+        /* 裁剪: 获取区间秒数 */
+        private int GetCutTimeRangeInSeconds()
+        {
+            TimeSpan startTime, endTime;
+            if (TimeSpan.TryParse(cut_start_time.Text, out startTime) &&
+                TimeSpan.TryParse(cut_end_time.Text, out endTime))
+            {
+                var seconds = (int)(endTime - startTime).TotalSeconds;
+                return Math.Max(0, seconds);
+            }
+            return 0;
         }
 
         /* GIF: gif处理界面的进度条事件 */
