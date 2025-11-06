@@ -551,9 +551,32 @@ namespace VideoTools
         /* 视频窗口: 视频加载失败 */
         private void MediaElement_MediaFailed(object sender, ExceptionRoutedEventArgs e)
         {
-            MessageBox.Show($"视频预览失败，但仍可使用FFmpeg进行处理。\n原因: {e.ErrorException.Message}");
+            // 捕获并识别常见的 HRESULT 错误码
+            int hr = e.ErrorException?.HResult ?? 0;
+            string reason = e.ErrorException?.Message ?? "未知错误";
+
+            if (hr == unchecked((int)0xC00D109B))
+            {
+                MessageBox.Show(
+                    "该视频无法在预览窗口播放（可能码率/分辨率过高或解码器不支持，例如8K）。\n但仍可使用FFmpeg进行压缩或转换。",
+                    "预览不支持",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information
+                );
+            }
+            else
+            {
+                MessageBox.Show($"视频预览失败，但仍可使用FFmpeg进行处理。\n原因: {reason}", "预览失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
             // 恢复叠加层显示（预览不可用），但不清空路径，以便压缩/转换等功能继续工作
             overlayGrid.Visibility = Visibility.Visible;
+            // 在叠加层上提示用户仍可处理
+            var tip = this.FindName("txtInstruction") as TextBlock;
+            if (tip != null)
+            {
+                tip.Text = "预览不可用，但仍可进行压缩/转换";
+            }
         }
 
         /* 视频窗口: 视频播放结束 */
