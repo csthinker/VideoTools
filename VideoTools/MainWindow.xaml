@@ -1082,32 +1082,47 @@
                     Click="BtnProcess_Click"/>
             </Grid>
 
-            <!-- 音频提取面板 -->
+            <!-- 音频处理面板 -->
             <Grid x:Name="voicePanel" Visibility="Collapsed" Margin="0,300,0,0">
-                <Grid Width="200" Height="40" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="33,62,0,0">
+                <!-- 顶部三项等宽布局 -->
+                <Grid Height="40" HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="33,62,33,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <!-- 删除音频 -->
                     <RadioButton x:Name="radiobtnVoiceDelete"
                         Grid.Column="0"
                         Content="删除音频"
-                        Style="{StaticResource ButtonRadioStyle}"/>
-                    <!-- 分隔线 -->
-                    <Border 
-                        Grid.Column="1"
-                        Width="1" 
-                        Height="28" 
-                        Margin="0,5,0,5" 
-                        Background="#E0E0E0"/>
+                        GroupName="VoiceAction"
+                        Style="{StaticResource ButtonRadioStyle}"
+                        HorizontalAlignment="Stretch"
+                        Margin="0,0,10,0"
+                        Click="RadioBtn_VoiceAction_Click"/>
                     <!-- 音频提取 -->
                     <RadioButton x:Name="radiobtnVoiceExtract"
-                        Grid.Column="2"
+                        Grid.Column="1"
                         Content="音频提取"
-                        Style="{StaticResource ButtonRadioStyle}" IsChecked="True"/>
+                        GroupName="VoiceAction"
+                        Style="{StaticResource ButtonRadioStyle}" IsChecked="True"
+                        HorizontalAlignment="Stretch"
+                        Margin="10,0,10,0"
+                        Click="RadioBtn_VoiceAction_Click"/>
+                    <!-- 替换音频 -->
+                    <RadioButton x:Name="radiobtnVoiceReplace"
+                        Grid.Column="2"
+                        Content="替换音频"
+                        GroupName="VoiceAction"
+                        Style="{StaticResource ButtonRadioStyle}"
+                        HorizontalAlignment="Stretch"
+                        Margin="10,0,0,0"
+                        Click="RadioBtn_VoiceAction_Click"/>
                 </Grid>
+                <!-- 替换音频文件选择 -->
+                <TextBox x:Name="textBoxVoiceReplacePath" HorizontalAlignment="Stretch" Height="30" Margin="33,110,127,0" TextWrapping="Wrap" VerticalAlignment="Top" FontSize="14" Visibility="Collapsed"/>
+                <Button x:Name="btnVoiceChooseAudio" Content="选择音频" Style="{StaticResource ModernSecondaryButtonStyle}" 
+                        HorizontalAlignment="Right" Margin="0,110,33,0" VerticalAlignment="Top" Width="86" Height="30" Click="BtnVoiceChooseAudio_Click" Visibility="Collapsed"/>
                 <Button Content="开始处理" Style="{StaticResource ModernButtonStyle}"
                     HorizontalAlignment="Left" Margin="485,195,0,0" VerticalAlignment="Top" Width="100" Height="36"
                     RenderTransformOrigin="0.12,0.579"

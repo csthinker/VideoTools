@@ -861,6 +861,11 @@ namespace VideoTools
                         suffix = "_mute_" + formattedTime;
                         extension = IOPath.GetExtension(sVideoFilePath);
                     }
+                    else if (true == radiobtnVoiceReplace.IsChecked)
+                    {
+                        suffix = "_replaceaudio_" + formattedTime;
+                        extension = IOPath.GetExtension(sVideoFilePath);
+                    }
                     break;
                 default:
                     sOutDir = "";
@@ -1094,6 +1099,42 @@ namespace VideoTools
                     {
                         sCmd += $" -an -c:v copy ";
                     }
+                    else if (true == radiobtnVoiceReplace.IsChecked)
+                    {
+                        // 校验外部音频路径
+                        string audioPath = textBoxVoiceReplacePath.Text?.Trim() ?? "";
+                        if (string.IsNullOrEmpty(audioPath) || !File.Exists(audioPath))
+                        {
+                            MessageBox.Show("请选择有效的音频文件以进行替换！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            sOutDir = ""; sOutFilePath = ""; return "";
+                        }
+                        // 添加第二路输入（音频）
+                        sCmd += " -i \"" + audioPath + "\"";
+                        // 选择合适的音频编码（与容器兼容）
+                        string extLower = extension.ToLower();
+                        string audioCodec = " -c:a aac ";
+                        if (extLower == ".webm")
+                        {
+                            audioCodec = " -c:a libopus ";
+                        }
+                        else if (extLower == ".ogv")
+                        {
+                            audioCodec = " -c:a libvorbis ";
+                        }
+                        else if (extLower == ".avi" || extLower == ".mpg" || extLower == ".mpeg")
+                        {
+                            audioCodec = " -c:a libmp3lame ";
+                        }
+                        else
+                        {
+                            audioCodec = " -c:a aac ";
+                        }
+
+                        // 构建：视频原样拷贝，音频替换；使用 apad 补足音频长度，-shortest 保持视频时长并在音频更长时裁切
+                        sCmd += " -filter_complex \"[1:a]apad[a]\" -map 0:v:0 -map \"[a]\" -shortest ";
+                        sCmd += " -c:v copy ";
+                        sCmd += audioCodec;
+                    }
                     break;
             }
 
@@ -1190,6 +1231,28 @@ namespace VideoTools
             videoCodeChoose = button.Tag.ToString();
 
             parseCompressVideoCode();
+        }
+
+        /* 音频: 选择替换音频文件 */
+        private void BtnVoiceChooseAudio_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog();
+            dlg.Title = "选择音频文件";
+            dlg.Filter = "音频文件|*.mp3;*.aac;*.wav;*.flac;*.ogg;*.opus;*.m4a;*.wma|所有文件|*.*";
+            dlg.CheckFileExists = true;
+            dlg.Multiselect = false;
+            if (dlg.ShowDialog() == true)
+            {
+                textBoxVoiceReplacePath.Text = dlg.FileName;
+            }
+        }
+
+        /* 音频：三个功能互斥，且根据选择显示/隐藏替换音频的文件选择控件 */
+        private void RadioBtn_VoiceAction_Click(object sender, RoutedEventArgs e)
+        {
+            bool isReplace = radiobtnVoiceReplace.IsChecked == true;
+            textBoxVoiceReplacePath.Visibility = isReplace ? Visibility.Visible : Visibility.Collapsed;
+            btnVoiceChooseAudio.Visibility = isReplace ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void parseConvertVideoCode() {
