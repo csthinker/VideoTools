@@ -887,8 +887,10 @@ namespace VideoTools
             /* 组合文件路径 */
             destinationPath = IOPath.Combine(targetFolder, newFileName);
 
-            /* 根据是否启用GPU加速设置码率，设置为推荐码率的40% */
-            if (true == checkBox_Setting_GpuUse.IsChecked)
+            /* 根据是否实际使用硬件编码设置码率：硬件用固定码率，CPU用CRF */
+            bool isHardwareEncoder = !string.IsNullOrEmpty(sOutVideoCode) &&
+                (sOutVideoCode.Contains("_nvenc") || sOutVideoCode.Contains("_qsv") || sOutVideoCode.Contains("_amf"));
+            if (true == checkBox_Setting_GpuUse.IsChecked && isHardwareEncoder)
             {
                 sCompressFormat = $" -b:v ";
                 /* 当未能获取视频高度时（预览失败），回退一个合理的基准比特率以避免0M导致编码失败 */
@@ -1225,6 +1227,42 @@ namespace VideoTools
                         sOutVideoCode = $" -c:v h264_{sCodeGpuSelect}";
                         break;
                 }
+
+                /* 兼容性检查：如果所选硬件编码器不可用或设备不支持，则安全回退 */
+                string desiredEncoder = sOutVideoCode.Replace("-c:v", string.Empty).Trim();
+                if (!FfmpegHasEncoder(desiredEncoder))
+                {
+                    // NVENC 的 AV1 在多数旧卡（如 GTX1650）不支持，优先回退到 H.264 NVENC
+                    if (sCodeGpuSelect == "nvenc" && videoCodeChoose == "radiobtn_compress_av1")
+                    {
+                        sOutVideoCode = " -c:v h264_nvenc";
+                        // 若 h264_nvenc 也不可用，则彻底回退到 CPU 编码
+                        if (!FfmpegHasEncoder("h264_nvenc"))
+                        {
+                            sOutVideoCode = " -c:v libx264";
+                        }
+                    }
+                    else
+                    {
+                        // 其它硬件编码器不可用时，回退到对应的 CPU 编码
+                        switch (videoCodeChoose)
+                        {
+                            case "radiobtn_compress_264":
+                                sOutVideoCode = " -c:v libx264";
+                                break;
+                            case "radiobtn_compress_265":
+                                sOutVideoCode = " -c:v libx265";
+                                break;
+                            case "radiobtn_compress_av1":
+                                // CPU 下暂不启用 libaom-av1，保持兼容与速度；使用 mpeg4 兜底
+                                sOutVideoCode = " -c:v mpeg4";
+                                break;
+                            default:
+                                sOutVideoCode = " -c:v libx264";
+                                break;
+                        }
+                    }
+                }
             }
             else
             {
@@ -1319,6 +1357,16 @@ namespace VideoTools
                         sConvertVideoCode = $" -c:v h264_{sCodeGpuSelect} -c:a aac ";
                         break;
                 }
+
+                // 如果选择了 NVENC/QSV/AMF，但 ffmpeg 缺少相应编码器，安全回退到 CPU
+                string encoderToken = sConvertVideoCode.ToLower().Contains("h264_") ? $"h264_{sCodeGpuSelect}" :
+                                      (sConvertVideoCode.ToLower().Contains("hevc_") ? $"hevc_{sCodeGpuSelect}" :
+                                       (sConvertVideoCode.ToLower().Contains("av1_") ? $"av1_{sCodeGpuSelect}" : ""));
+                if (!string.IsNullOrEmpty(encoderToken) && !FfmpegHasEncoder(encoderToken))
+                {
+                    // 回退为 libx264 + 合适音频编码
+                    sConvertVideoCode = " -c:v libx264 -c:a aac ";
+                }
             }
             else
             {
@@ -1343,6 +1391,40 @@ namespace VideoTools
                         sConvertVideoCode = $" -c:v libx264 -c:a aac ";
                         break;
                 }
+            }
+        }
+
+        /* 检测 ffmpeg 是否包含指定编码器（如 h264_nvenc、hevc_qsv 等） */
+        private bool FfmpegHasEncoder(string encoderName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(sFFmpegFilePath) || !File.Exists(sFFmpegFilePath))
+                {
+                    return false;
+                }
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = sFFmpegFilePath,
+                    Arguments = " -hide_banner -v 0 -encoders",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+                using (var p = new Process { StartInfo = psi })
+                {
+                    p.Start();
+                    string output = p.StandardOutput.ReadToEnd();
+                    // 避免阻塞过久
+                    p.WaitForExit(3000);
+                    return !string.IsNullOrEmpty(output) && output.IndexOf(encoderName, StringComparison.OrdinalIgnoreCase) >= 0;
+                }
+            }
+            catch
+            {
+                return false;
             }
         }
 
