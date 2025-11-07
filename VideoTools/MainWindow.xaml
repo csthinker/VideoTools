@@ -768,7 +768,7 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xe686;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
                                    Margin="10 0 0 0" Foreground="Green"/>
-                        <TextBlock  Margin="10 0 0 0" Text="转GIF"  FontSize="14" VerticalAlignment="Center"
+                        <TextBlock  Margin="10 0 0 0" Text="转动图"  FontSize="14" VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={
                                     RelativeSource FindAncestor, AncestorLevel=1, AncestorType={x:Type RadioButton}}}" />
                     </StackPanel>
@@ -946,82 +946,112 @@
                         Click="BtnProcess_Click"/>
             </Grid>
 
-            <!-- GIF面板 -->
+            <!-- GIF/动图面板 -->
             <Grid x:Name="gifPanel" Visibility="Collapsed" Margin="0,300,0,0">
-                <Label Content="每秒帧数(FPS)" HorizontalAlignment="Left" Margin="22,34,0,0" VerticalAlignment="Top" Width="127" FontSize="16"/>
+                <!-- 顶部：动图格式选择 -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="22,20,0,0" VerticalAlignment="Top">
+                    <Label Content="动图格式" Width="73" FontSize="16"/>
+                    <RadioButton x:Name="radioGifFormatGif" Content="GIF" GroupName="AnimatedFormat"
+                                 Tag=".gif" IsChecked="True" FontSize="16" Margin="10,5,0,0"
+                                 Click="RadioBtn_GifFormatChoose_Click"/>
+                    <RadioButton x:Name="radioGifFormatWebp" Content="WebP" GroupName="AnimatedFormat"
+                                 Tag=".webp" FontSize="16" Margin="10,5,0,0"
+                                 Click="RadioBtn_GifFormatChoose_Click"/>
+                </StackPanel>
+                <Label Content="每秒帧数(FPS)" HorizontalAlignment="Left" Margin="22,50,0,0" VerticalAlignment="Top" Width="127" FontSize="16"/>
                 <Slider x:Name="sliderGifFps" Style="{StaticResource ModernSliderStyle}"
-                        HorizontalAlignment="Left" Margin="27,73,0,0" VerticalAlignment="Top" Width="278" 
+                        HorizontalAlignment="Left" Margin="27,90,0,0" VerticalAlignment="Top" Width="278" 
                         Minimum="5" Maximum="30" Value="10"
                         ValueChanged="GifSlider_ValueChanged"/>
-                <TextBox x:Name="textBox_Gif_Fps" HorizontalAlignment="Left" Height="20" Margin="310,71,0,0" TextWrapping="Wrap" Text="10" VerticalAlignment="Top" Width="44" FontSize="14" TextAlignment="Center"/>
-                <Label Content="GIF大小" HorizontalAlignment="Left" Margin="22,98,0,0" VerticalAlignment="Top" Width="73" FontSize="16"/>
-                <TextBox x:Name="textBox_Gif_Width" HorizontalAlignment="Left" Height="20" Margin="128,103,0,0" TextWrapping="Wrap" Text="0" VerticalAlignment="Top" Width="68" FontSize="14" TextAlignment="Center"/>
-                <TextBox x:Name="textBox_Gif_Height" HorizontalAlignment="Left" Height="20" Margin="222,103,0,0" TextWrapping="Wrap" Text="0" VerticalAlignment="Top" Width="67" FontSize="14" TextAlignment="Center"/>
-                <Label Content="宽" HorizontalAlignment="Left" Margin="109,104,0,0" VerticalAlignment="Top" Width="24"/>
-                <Label Content="高" HorizontalAlignment="Left" Margin="202,104,0,0" VerticalAlignment="Top" Width="24"/>
-                <Label Content="开始位置" HorizontalAlignment="Left" Margin="22,139,0,0" VerticalAlignment="Top" Width="84" FontSize="16"/>
-                <Grid Style="{StaticResource TimeSpinnerStyle}" Margin="122,142,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <TextBox x:Name="textBox_Gif_Fps" HorizontalAlignment="Left" Height="20" Margin="310,88,0,0" TextWrapping="Wrap" Text="10" VerticalAlignment="Top" Width="44" FontSize="14" TextAlignment="Center"/>
+                <Label Content="动图大小" HorizontalAlignment="Left" Margin="22,0,0,0" VerticalAlignment="Center" Width="73" FontSize="16"/>
+                <TextBox x:Name="textBox_Gif_Width" HorizontalAlignment="Left" Height="20" Margin="128,125,0,0" TextWrapping="Wrap" Text="0" VerticalAlignment="Top" Width="68" FontSize="14" TextAlignment="Center"/>
+                <TextBox x:Name="textBox_Gif_Height" HorizontalAlignment="Left" Height="20" Margin="222,125,0,0" TextWrapping="Wrap" Text="0" VerticalAlignment="Top" Width="67" FontSize="14" TextAlignment="Center"/>
+                <Label Content="宽" HorizontalAlignment="Left" Margin="109,126,0,0" VerticalAlignment="Top" Width="24"/>
+                <Label Content="高" HorizontalAlignment="Left" Margin="202,126,0,0" VerticalAlignment="Top" Width="24"/>
+                <!-- 开始/结束位置并排布局（标签与时间控件横向） -->
+                <Grid HorizontalAlignment="Left" Margin="22,160,0,0" VerticalAlignment="Top">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="300"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="txtStartTime" 
-                            Text="00:00:00" 
-                            FontSize="14" 
-                            VerticalContentAlignment="Center"
-                            TextAlignment="Center"
-                            PreviewTextInput="TimeTextBox_PreviewTextInput"
-                            TextChanged="TimeTextBox_TextChanged"/>
-                    <StackPanel Grid.Column="1" Width="20">
-                        <RepeatButton Style="{StaticResource SpinButtonStyleUp}"
-                            Click="TimeSpinButton_Up_Click"/>
-                        <RepeatButton Style="{StaticResource SpinButtonStyleDown}"
-                            Click="TimeSpinButton_Down_Click"/>
-                    </StackPanel>
+                    <!-- 开始位置：标签与时间控件横排 -->
+                    <Grid Grid.Column="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="84"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Label Grid.Column="0" Content="开始位置" Width="84" FontSize="16" VerticalAlignment="Top" Margin="0,-1,0,0"/>
+                        <Grid Grid.Column="1" Style="{StaticResource TimeSpinnerStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="txtStartTime" 
+                                    Text="00:00:00" 
+                                    FontSize="14" 
+                                    VerticalContentAlignment="Center"
+                                    TextAlignment="Center"
+                                    PreviewTextInput="TimeTextBox_PreviewTextInput"
+                                    TextChanged="TimeTextBox_TextChanged"/>
+                            <StackPanel Grid.Column="1" Width="20">
+                                <RepeatButton Style="{StaticResource SpinButtonStyleUp}"
+                                    Click="TimeSpinButton_Up_Click"/>
+                                <RepeatButton Style="{StaticResource SpinButtonStyleDown}"
+                                    Click="TimeSpinButton_Down_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                    <!-- 结束位置：标签与时间控件横排 -->
+                    <Grid Grid.Column="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="84"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Label Grid.Column="0" Content="结束位置" Width="84" FontSize="16" VerticalAlignment="Top" Margin="0,-1,0,0"/>
+                        <Grid Grid.Column="1" Style="{StaticResource TimeSpinnerStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="txtEndTime" 
+                                Text="00:00:00" 
+                                FontSize="14" 
+                                VerticalContentAlignment="Center"
+                                TextAlignment="Center"
+                                PreviewTextInput="TimeTextBox_PreviewTextInput"
+                                TextChanged="TimeTextBox_TextChanged"/>
+                            <StackPanel Grid.Column="1" Width="20">
+                                <RepeatButton Style="{StaticResource SpinButtonStyleUp}"
+                                    Click="TimeSpinButton_Up_Click"/>
+                                <RepeatButton Style="{StaticResource SpinButtonStyleDown}"
+                                    Click="TimeSpinButton_Down_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
                 </Grid>
-
-                <Label Content="结束位置" HorizontalAlignment="Left" Margin="22,170,0,0" VerticalAlignment="Top" Width="84" FontSize="16"/>
-                <Grid Style="{StaticResource TimeSpinnerStyle}" Margin="122,175,0,0" HorizontalAlignment="Left" VerticalAlignment="Top">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBox x:Name="txtEndTime" 
-                        Text="00:00:00" 
-                        FontSize="14" 
-                        VerticalContentAlignment="Center"
-                        TextAlignment="Center"
-                        PreviewTextInput="TimeTextBox_PreviewTextInput"
-                        TextChanged="TimeTextBox_TextChanged"/>
-                    <StackPanel Grid.Column="1" Width="20">
-                        <RepeatButton Style="{StaticResource SpinButtonStyleUp}"
-                            Click="TimeSpinButton_Up_Click"/>
-                        <RepeatButton Style="{StaticResource SpinButtonStyleDown}"
-                            Click="TimeSpinButton_Down_Click"/>
-                    </StackPanel>
-                </Grid>
-                <CheckBox x:Name="checkBox_Gif_Loop" Content="GIF循环播放" HorizontalAlignment="Left" Margin="374,73,0,0" VerticalAlignment="Top" Width="109" IsChecked="True" Height="18" FontSize="14"/>
+                <CheckBox x:Name="checkBox_Gif_Loop" Content="动图循环播放" HorizontalAlignment="Left" Margin="375,90,0,0" VerticalAlignment="Top" Width="109" IsChecked="True" Height="18" FontSize="14"/>
                 <Button Content="开始处理" Style="{StaticResource ModernButtonStyle}"
-                        HorizontalAlignment="Left" Margin="485,195,0,0" VerticalAlignment="Top" Width="100" Height="36"
+                        HorizontalAlignment="Left" Margin="485,213,0,0" VerticalAlignment="Top" Width="100" Height="36"
                         RenderTransformOrigin="0.12,0.579"
                         Click="BtnProcess_Click"/>
                 <Button Tag="320" Style="{StaticResource ModernSecondaryButtonStyle}" 
-                        Content="320P" HorizontalAlignment="Left" Margin="310,103,0,0" VerticalAlignment="Top" Width="40" 
+                        Content="320P" HorizontalAlignment="Left" Margin="310,0,0,0" VerticalAlignment="Center" Width="40" 
                         Click="BtnGifResize_Click"/>
                 <Button Tag="480" Style="{StaticResource ModernSecondaryButtonStyle}"
-                        Content="480P" HorizontalAlignment="Left" Margin="355,103,0,0" VerticalAlignment="Top" Width="40"
+                        Content="480P" HorizontalAlignment="Left" Margin="355,0,0,0" VerticalAlignment="Center" Width="40"
                         Click="BtnGifResize_Click"/>
                 <Button Tag="720" Style="{StaticResource ModernSecondaryButtonStyle}" 
-                        Content="720P" HorizontalAlignment="Left" Margin="400,103,0,0" VerticalAlignment="Top" Width="40" 
+                        Content="720P" HorizontalAlignment="Left" Margin="400,0,0,0" VerticalAlignment="Center" Width="40" 
                         Click="BtnGifResize_Click"/>
                 <Button Tag="1080" Style="{StaticResource ModernSecondaryButtonStyle}" 
-                        Content="1080P" HorizontalAlignment="Left" Margin="445,103,0,0" VerticalAlignment="Top" Width="50" 
+                        Content="1080P" HorizontalAlignment="Left" Margin="445,0,0,0" VerticalAlignment="Center" Width="50" 
                         Click="BtnGifResize_Click"/>
                 <Button Tag="Orig" Style="{StaticResource ModernSecondaryButtonStyle}" 
-                        Content="原始" HorizontalAlignment="Left" Margin="500,103,0,0" VerticalAlignment="Top" Width="50" 
+                        Content="原始" HorizontalAlignment="Left" Margin="500,0,0,0" VerticalAlignment="Center" Width="50" 
                         Click="BtnGifResize_Click"/>
                 <CheckBox x:Name="checkBox_Gif_EnablePalettegen" Content="启用着色器" 
-                             HorizontalAlignment="Left" Margin="485,73,0,0" 
+                             HorizontalAlignment="Left" Margin="485,90,0,0" 
                              VerticalAlignment="Top" Height="18" Width="110" FontSize="14"
                              >
                     <CheckBox.ToolTip>

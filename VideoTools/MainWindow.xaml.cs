@@ -152,6 +152,7 @@ namespace VideoTools
         private string sVideoFilePath, sFFmpegFilePath, sVideoSaveFolder;
         private string videoCodeChoose = "radiobtn_compress_264", sOutVideoCode = $" -c:v libx264";
         private string sConvertVideoCode = $" -c:v libx264", sVideoFormat = $".mp4", sCrf = $"25", sCompressFormat = " -crf 25 ";
+        private string sAnimatedImageFormat = ".gif"; /* .gif 或 .webp */
         private string sToolChoose = "compress";
         private CancellationTokenSource _cancellationTokenSource; /* 全局的取消事件 */
         private double baseBitrate = 0.0;
@@ -835,8 +836,16 @@ namespace VideoTools
                     extension = sVideoFormat;
                     break;
                 case "gif":
-                    suffix = "_gif_" + formattedTime;
-                    extension = $".gif";
+                    if (sAnimatedImageFormat == ".webp")
+                    {
+                        suffix = "_webp_" + formattedTime;
+                        extension = ".webp";
+                    }
+                    else
+                    {
+                        suffix = "_gif_" + formattedTime;
+                        extension = ".gif";
+                    }
                     break;
                 case "cut":
                     suffix = "_cut_" + formattedTime;
@@ -957,19 +966,32 @@ namespace VideoTools
                         sCmd += $" -t ";
                         sCmd += timeRangeInSeconds.ToString();
                     }
-                    sCmd += $" -vf \"fps=";
-                    sCmd += textBox_Gif_Fps.Text.ToString();
-                    sCmd += $",scale=";
-                    sCmd += textBox_Gif_Width.Text.ToString();
-                    if (true == checkBox_Gif_EnablePalettegen.IsChecked)
+                    if (sAnimatedImageFormat == ".webp")
                     {
-                        sCmd += $":-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=none\" -an -loop ";
+                        sCmd += " -vf \"fps=";
+                        sCmd += textBox_Gif_Fps.Text.ToString();
+                        sCmd += ",scale=";
+                        sCmd += textBox_Gif_Width.Text.ToString();
+                        sCmd += ":-1:flags=lanczos\" -an ";
+                        sCmd += " -vcodec libwebp -lossless 0 -compression_level 6 -q:v 65 -loop ";
+                        sCmd += (true == checkBox_Gif_Loop.IsChecked) ? "0" : "1";
                     }
                     else
                     {
-                        sCmd += $":-1:flags=lanczos\" -an -loop ";
+                        sCmd += " -vf \"fps=";
+                        sCmd += textBox_Gif_Fps.Text.ToString();
+                        sCmd += ",scale=";
+                        sCmd += textBox_Gif_Width.Text.ToString();
+                        if (true == checkBox_Gif_EnablePalettegen.IsChecked)
+                        {
+                            sCmd += ":-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=none\" -an -loop ";
+                        }
+                        else
+                        {
+                            sCmd += ":-1:flags=lanczos\" -an -loop ";
+                        }
+                        sCmd += (true == checkBox_Gif_Loop.IsChecked) ? "0" : "1";
                     }
-                    sCmd += (true == checkBox_Gif_Loop.IsChecked) ? "0" : "1";
                     break;
                 case "cut":
                     int cutRangeSeconds = GetCutTimeRangeInSeconds();
@@ -1398,6 +1420,21 @@ namespace VideoTools
             }
 
             parseConvertVideoCode();
+        }
+
+        /* 动图：格式选择（GIF/WebP） */
+        private void RadioBtn_GifFormatChoose_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as RadioButton;
+            string formatTag = button?.Tag?.ToString()?.ToLower() ?? ".gif";
+            if (formatTag == ".webp")
+            {
+                sAnimatedImageFormat = ".webp";
+            }
+            else
+            {
+                sAnimatedImageFormat = ".gif";
+            }
         }
 
         /* GIF: 一些判断处理 */
