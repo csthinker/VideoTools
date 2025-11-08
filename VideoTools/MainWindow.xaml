@@ -685,6 +685,35 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        
+        <!-- 侧边栏箭头按钮样式：扩大可点击区域、扁平化外观 -->
+        <Style x:Key="SidebarArrowButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="MinWidth" Value="28"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="0" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1A000000"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#33000000"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -716,7 +745,7 @@
                                    FontWeight="Bold"/>
                     </StackPanel>
                 </UniformGrid>
-                <RadioButton x:Name="radiobtn_compress"  Tag="compress" 
+                <RadioButton x:Name="radiobtn_compress"  Tag="compress" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" 
                              Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
@@ -729,10 +758,41 @@
                                             AncestorType={x:Type RadioButton}
                                         }
                                     }" />
+                        <!-- 展开箭头：扩大点击区域并更换更醒目的箭头样式 -->
+                        <Button Click="ToggleCompressSub_Click"
+                                Style="{StaticResource SidebarArrowButtonStyle}"
+                                Margin="8,0,0,0" VerticalAlignment="Center"
+                                ToolTip="展开/收起">
+                            <TextBlock x:Name="txtCompressArrow" Text="⯆" FontSize="16"
+                                       Foreground="{Binding Foreground, RelativeSource={
+                                                RelativeSource FindAncestor,
+                                                AncestorLevel=2,
+                                                AncestorType={x:Type RadioButton}
+                                            }}"/>
+                        </Button>
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton Tag="cut" 
+                <!-- 批量压缩入口：作为“视频压缩”的子项，默认折叠 -->
+                <StackPanel x:Name="compressSubPanel" Visibility="Collapsed">
+                    <RadioButton x:Name="radiobtn_compress_batch" Tag="compress_batch" GroupName="SidebarNav"
+                                 Style="{DynamicResource RadioButtonStyle}"
+                                 Click="RadioBtn_Compress_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xe6d1;" FontFamily="./assets/fonts/#iconfont" FontSize="20"
+                                       Margin="28 0 0 0" Foreground="#2196F3"/>
+                            <TextBlock Margin="10 0 0 0" Text="批量压缩" FontSize="13" VerticalAlignment="Center"
+                                       Foreground="{Binding Foreground, RelativeSource={
+                                                RelativeSource FindAncestor,
+                                                AncestorLevel=1,
+                                                AncestorType={x:Type RadioButton}
+                                            }
+                                        }" />
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+
+                <RadioButton Tag="cut" GroupName="SidebarNav"
                      Style="{DynamicResource RadioButtonStyle}" 
                      Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
@@ -748,7 +808,7 @@
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton Tag="convert" 
+                <RadioButton Tag="convert" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xe6d1;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
@@ -763,7 +823,7 @@
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton Tag="gif"
+                <RadioButton Tag="gif" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xe686;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
@@ -774,7 +834,7 @@
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton Tag="multiple" 
+                <RadioButton Tag="multiple" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xf0de;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
@@ -785,7 +845,7 @@
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton Tag="resize" 
+                <RadioButton Tag="resize" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xe600;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
@@ -796,7 +856,7 @@
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton Tag="voice" 
+                <RadioButton Tag="voice" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xe67f;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
@@ -807,7 +867,7 @@
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton x:Name="radiobtn_setting" Tag="setting" 
+                <RadioButton x:Name="radiobtn_setting" Tag="setting" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click" >
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xea6b;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
@@ -1251,6 +1311,43 @@
                             MediaOpened="MediaElement_MediaOpened"
                             MediaFailed="MediaElement_MediaFailed"/>
             </Viewbox>
+
+            <!-- 批量压缩模式：文件列表与按钮区域（默认隐藏） -->
+            <Grid x:Name="batchArea" Grid.RowSpan="2" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <StackPanel Orientation="Horizontal" Margin="10" Grid.Row="0">
+                    <Button x:Name="btnBatchOpenFiles" Style="{StaticResource ModernSecondaryButtonStyle}"
+                            Content="选择多个文件" Width="120" Height="30" Click="BtnBatchOpenFiles_Click"/>
+                    <Button x:Name="btnBatchClearFiles" Style="{StaticResource ModernSecondaryButtonStyle}"
+                            Content="清空列表" Width="100" Height="30" Margin="10,0,0,0" Click="BtnBatchClearFiles_Click"/>
+                    <TextBlock Text="（可直接拖拽多个视频到下方列表导入）" Foreground="#DDDDDD" Margin="10,5,0,0"/>
+                </StackPanel>
+                <Border Grid.Row="1" Margin="10" Background="#1F1F1F" BorderBrush="#3A3A3A" BorderThickness="1">
+                    <ListView x:Name="batchListView" AllowDrop="True"
+                              Drop="BatchListView_Drop" PreviewDragOver="BatchListView_PreviewDragOver">
+                        <!-- 右键菜单作为资源声明，避免解析歧义 -->
+                        <ListView.Resources>
+                            <ContextMenu x:Key="BatchListItemContextMenu">
+                                <MenuItem Header="移除该文件" Click="MenuItemRemoveFromBatch_Click" CommandParameter="{Binding}"/>
+                            </ContextMenu>
+                        </ListView.Resources>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="ContextMenu" Value="{StaticResource BatchListItemContextMenu}"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="文件名" Width="240" DisplayMemberBinding="{Binding FileName}"/>
+                                <GridViewColumn Header="路径" Width="500" DisplayMemberBinding="{Binding FilePath}"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Border>
+            </Grid>
 
             <!-- 控制栏 -->
             <Border x:Name="controlBar" 

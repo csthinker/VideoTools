@@ -20,6 +20,7 @@ using System.Windows.Threading;
 using Microsoft.Win32;
 
 using System.Diagnostics;
+using System.Collections.ObjectModel;
 
 using IOPath = System.IO.Path;
 using System.Threading;
@@ -157,6 +158,21 @@ namespace VideoTools
         private CancellationTokenSource _cancellationTokenSource; /* 全局的取消事件 */
         private double baseBitrate = 0.0;
         private int maxThreads = 0;
+        private bool isBatchMode = false; /* 批量压缩模式 */
+        private bool isCompressSubExpanded = false; /* 侧栏“视频压缩”子项展开状态 */
+
+        /* 批量文件项 */
+        private class BatchFileItem
+        {
+            public string FileName { get; set; } = "";
+            public string FilePath { get; set; } = "";
+        }
+
+        private ObservableCollection<BatchFileItem> batchFiles = new ObservableCollection<BatchFileItem>();
+        private static readonly HashSet<string> _videoExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp4",".avi",".wmv",".mov",".mkv",".webm",".flv",".ts",".m2ts",".mts",".mpg",".mpeg",".m4v",".3gp",".3g2",".ogv",".vob",".asf",".mxf",".rmvb",".rm",".y4m"
+        };
 
         public MainWindow()
         {
@@ -294,16 +310,12 @@ namespace VideoTools
         /* 全局: 验证视频格式 */
         private bool IsVideoFile(string filePath)
         {
-            string ext = IOPath.GetExtension(filePath).ToLower();
-            // 扩展支持的容器格式；预览可能受系统编解码器限制，但FFmpeg处理不受限
-            string[] supported = new[] {
-                ".mp4", ".avi", ".wmv", ".mov", ".mkv",
-                ".webm", ".flv", ".ts", ".m2ts", ".mts",
-                ".mpg", ".mpeg", ".m4v", ".3gp", ".3g2",
-                ".ogv", ".ogg", ".vob", ".asf", ".mxf",
-                ".rmvb", ".rm", ".y4m"
-            };
-            return supported.Contains(ext);
+            try
+            {
+                var ext = IOPath.GetExtension(filePath).ToLower();
+                return _videoExts.Contains(ext);
+            }
+            catch { return false; }
         }
 
         /* 全局: 初始化定时器 */
@@ -332,7 +344,7 @@ namespace VideoTools
 
         }
 
-        /* 视频窗口: 拖放文件处理 */
+        /* 视频窗口: 拖放文件处理（支持批量模式） */
         private void Window_Drop(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -340,8 +352,15 @@ namespace VideoTools
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 if (files.Length > 0)
                 {
-                    PlayVideo(files[0]);
-                    sVideoFilePath = files[0];
+                    if (isBatchMode)
+                    {
+                        AddBatchFiles(files);
+                    }
+                    else
+                    {
+                        PlayVideo(files[0]);
+                        sVideoFilePath = files[0];
+                    }
                 }
             }
         }
@@ -364,6 +383,80 @@ namespace VideoTools
                 hideControlTimer.Stop();
                 PlayVideo(openFileDialog.FileName);
                 sVideoFilePath = openFileDialog.FileName;
+            }
+        }
+
+        /* 批量模式：辅助方法与事件 */
+        private void AddBatchFiles(IEnumerable<string> files)
+        {
+            foreach (var f in files)
+            {
+                if (!IsVideoFile(f)) continue;
+                if (batchFiles.Any(x => string.Equals(x.FilePath, f, StringComparison.OrdinalIgnoreCase))) continue;
+                batchFiles.Add(new BatchFileItem
+                {
+                    FilePath = f,
+                    FileName = IOPath.GetFileName(f)
+                });
+            }
+
+            Dispatcher.Invoke(() =>
+            {
+                batchListView.ItemsSource = batchFiles;
+            });
+        }
+
+        /* 侧边栏：展开/收起“视频压缩”的子项（批量压缩） */
+        private void ToggleCompressSub_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            isCompressSubExpanded = !isCompressSubExpanded;
+            var panel = this.FindName("compressSubPanel") as FrameworkElement;
+            var arrow = this.FindName("txtCompressArrow") as TextBlock;
+            if (panel != null)
+            {
+                panel.Visibility = isCompressSubExpanded ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (arrow != null)
+            {
+                arrow.Text = isCompressSubExpanded ? "⯅" : "⯆";
+            }
+            e.Handled = true;
+        }
+
+        /* 侧边栏：箭头按钮点击切换展开状态 */
+        private void ToggleCompressSub_Click(object sender, RoutedEventArgs e)
+        {
+            isCompressSubExpanded = !isCompressSubExpanded;
+            var panel = this.FindName("compressSubPanel") as FrameworkElement;
+            var arrow = this.FindName("txtCompressArrow") as TextBlock;
+            if (panel != null)
+            {
+                panel.Visibility = isCompressSubExpanded ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (arrow != null)
+            {
+                arrow.Text = isCompressSubExpanded ? "⯅" : "⯆";
+            }
+            e.Handled = true;
+        }
+
+        private void UpdateVideoAreaForBatchMode()
+        {
+            if (isBatchMode)
+            {
+                overlayGrid.Visibility = Visibility.Collapsed;
+                controlBar.Visibility = Visibility.Collapsed;
+                mediaPlayer.Visibility = Visibility.Collapsed;
+                topBar.Visibility = Visibility.Collapsed;
+                batchArea.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                batchArea.Visibility = Visibility.Collapsed;
+                mediaPlayer.Visibility = Visibility.Visible;
+                topBar.Visibility = isFileOpened ? Visibility.Visible : Visibility.Collapsed;
+                overlayGrid.Visibility = isFileOpened ? Visibility.Collapsed : Visibility.Visible;
+                controlBar.Visibility = isPlaying ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
@@ -593,8 +686,20 @@ namespace VideoTools
         private void RadioBtn_Compress_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as RadioButton;
-            string panelName = button.Tag.ToString() + "Panel";
-            sToolChoose = button.Tag.ToString();
+            string tag = button.Tag.ToString();
+            string panelName = tag + "Panel";
+            sToolChoose = tag;
+
+            if ("compress_batch" == tag)
+            {
+                isBatchMode = true;
+                panelName = "compressPanel"; // 使用压缩面板配置
+                sToolChoose = "compress";    // 复用压缩逻辑
+            }
+            else
+            {
+                isBatchMode = false;
+            }
 
             if ("setting" != sToolChoose)
             {
@@ -621,6 +726,8 @@ namespace VideoTools
                 /* 显示当前面板 */
                 panel.Visibility = Visibility.Visible;
             }
+
+            UpdateVideoAreaForBatchMode();
         }
 
         /* ffmpeg: 判断ffmpeg文件是否存在 */
@@ -2159,19 +2266,34 @@ namespace VideoTools
         /* 全局: 所有的处理任务按钮事件 */
         private async void BtnProcess_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(sVideoFilePath))
+            if (!isBatchMode)
             {
-                MessageBox.Show("请先导入视频！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                if (string.IsNullOrEmpty(sVideoFilePath))
+                {
+                    MessageBox.Show("请先导入视频！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+            else
+            {
+                if (batchFiles.Count == 0)
+                {
+                    MessageBox.Show("请先添加要批量压缩的文件！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
             }
 
             string targetFolder = "", destinationPath = "";
-            string sCmd = makeFfmpegCmd(out targetFolder, out destinationPath);
-
-            if (string.IsNullOrEmpty(sCmd))
+            string sCmd = "";
+            if (!isBatchMode)
             {
-                MessageBox.Show("创建任务失败！", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                sCmd = makeFfmpegCmd(out targetFolder, out destinationPath);
+
+                if (string.IsNullOrEmpty(sCmd))
+                {
+                    MessageBox.Show("创建任务失败！", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
             }
 
             //MessageBox.Show($"{sToolChoose} = {sCmd}", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2193,33 +2315,67 @@ namespace VideoTools
                 /* 异步执行任务 */
                 await Task.Run(() =>
                 {
-                    //MessageBox.Show(sCmd, "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-                    ffmpegProcess(_cancellationTokenSource.Token, sCmd);
-
-                    /* 只有在没有取消的情况下才显示完成消息 */
-                    if (!_cancellationTokenSource.Token.IsCancellationRequested)
+                    if (!isBatchMode)
                     {
-                        if (File.Exists(destinationPath))
+                        ffmpegProcess(_cancellationTokenSource.Token, sCmd);
+
+                        if (!_cancellationTokenSource.Token.IsCancellationRequested)
                         {
-                            /* 启动资源管理器进程 */
-                            Process.Start(new ProcessStartInfo
+                            if (File.Exists(destinationPath))
                             {
-                                FileName = "explorer.exe",
-                                Arguments = targetFolder,
-                                UseShellExecute = false
-                            });
+                                Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = "explorer.exe",
+                                    Arguments = targetFolder,
+                                    UseShellExecute = false
+                                });
+                            }
+                        }
+                        else
+                        {
+                            if (File.Exists(destinationPath))
+                            {
+                                File.Delete(destinationPath);
+                            }
                         }
                     }
                     else
                     {
-                        /* 如果用户取消，删除生成的文件 */
-                        if (File.Exists(destinationPath))
+                        int total = batchFiles.Count;
+                        string lastFolder = "";
+                        for (int i = 0; i < total; i++)
                         {
-                            File.Delete(destinationPath);
+                            if (_cancellationTokenSource.Token.IsCancellationRequested) break;
+                            var item = batchFiles[i];
+
+                            string cmdLocal = null;
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                // 在 UI 线程更新界面并生成命令，避免跨线程访问控件
+                                sVideoFilePath = item.FilePath;
+                                textBoxOverlayRunning.Text = $"正在处理 {i + 1}/{total}：{item.FileName}";
+                                progressBarOverlayRunning.Value = 1;
+
+                                string tf2 = "", dp2 = "";
+                                cmdLocal = makeFfmpegCmd(out tf2, out dp2);
+                                lastFolder = tf2;
+                            });
+
+                            // 在后台线程执行 ffmpeg 处理
+                            ffmpegProcess(_cancellationTokenSource.Token, cmdLocal);
+                        }
+
+                        if (!_cancellationTokenSource.Token.IsCancellationRequested && !string.IsNullOrEmpty(lastFolder))
+                        {
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "explorer.exe",
+                                Arguments = lastFolder,
+                                UseShellExecute = false
+                            });
                         }
                     }
-                }
-                );
+                });
             }
             catch (OperationCanceledException)
             {
@@ -2254,6 +2410,59 @@ namespace VideoTools
             catch (ObjectDisposedException)
             {
                 // 忽略已释放的异常
+            }
+        }
+
+        /* 批量模式：列表拖拽导入事件 */
+        private void BatchListView_PreviewDragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+            }
+        }
+
+        private void BatchListView_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                AddBatchFiles(files);
+            }
+        }
+
+        /* 批量模式：选择多个文件 */
+        private void BtnBatchOpenFiles_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Filter = "视频文件|*.mp4;*.avi;*.wmv;*.mov;*.mkv;*.webm;*.flv;*.ts;*.m2ts;*.mts;*.mpg;*.mpeg;*.m4v;*.3gp;*.3g2;*.ogv;*.vob;*.asf;*.mxf;*.rmvb;*.rm;*.y4m|所有文件|*.*",
+                Multiselect = true
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                AddBatchFiles(openFileDialog.FileNames);
+            }
+        }
+
+        /* 批量模式：清空当前列表 */
+        private void BtnBatchClearFiles_Click(object sender, RoutedEventArgs e)
+        {
+            batchFiles.Clear();
+        }
+
+        /* 批量模式：右键移除某个文件 */
+        private void MenuItemRemoveFromBatch_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem mi)
+            {
+                var item = mi.CommandParameter as BatchFileItem;
+                if (item != null)
+                {
+                    batchFiles.Remove(item);
+                }
             }
         }
 
