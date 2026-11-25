@@ -21,9 +21,11 @@ using Microsoft.Win32;
 
 using System.Diagnostics;
 using System.Collections.ObjectModel;
+using System.Globalization;
 
 using IOPath = System.IO.Path;
 using System.Threading;
+using System.Runtime.InteropServices;
 using System.Windows.Controls.Primitives;
 
 namespace VideoTools
@@ -35,19 +37,10 @@ namespace VideoTools
 
         public IniConfig()
         {
-            /* 获取用户目录路径，C:\Users\xxxxx\AppData\Roaming */
-            var userDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-
-            /* 定义配置文件的路径 */
-            var appName = ".VideoTools_250405"; /* 使用这种特殊的目录避免程序名和其他程序冲突 */
-            var appDataPath = IOPath.Combine(userDir, appName);
-            _filePath = IOPath.Combine(appDataPath, "config.ini");
-
-            /* 如果目录不存在，则创建 */
-            if (!Directory.Exists(appDataPath))
-            {
-                Directory.CreateDirectory(appDataPath);
-            }
+            /* 便携优先：程序目录\data 可写时，配置与程序放在一起，整个文件夹可拷到别的电脑；
+               程序目录不可写（如安装到 Program Files）时自动回退到 %APPDATA% */
+            _filePath = VideoTools.Automation.AppPaths.ConfigFile;
+            VideoTools.Automation.AppPaths.EnsureDirectory(IOPath.GetDirectoryName(_filePath));
 
             /* 如果文件不存在则创建默认配置 */
             if (!File.Exists(_filePath))
@@ -160,6 +153,12 @@ namespace VideoTools
         private int maxThreads = 0;
         private bool isBatchMode = false; /* 批量压缩模式 */
         private bool isCompressSubExpanded = false; /* 侧栏“视频压缩”子项展开状态 */
+        private bool isLangInited = false; /* 语言下拉初始化完成标志 */
+        private bool isConvertSubExpanded = false;  /* 侧栏“格式转换”子项展开状态 */
+
+        /* ffmpeg 最近一次错误输出（失败时展示原因、写入日志，便于定位问题） */
+        private readonly object _ffmpegErrorLock = new object();
+        private string _lastFfmpegError = "";
 
         /* 批量文件项 */
         private class BatchFileItem
@@ -193,6 +192,8 @@ namespace VideoTools
         {
             var config = new IniConfig();
             sFFmpegFilePath = config.Read("Program", "FFmpegPath");
+            /* 配置里可能是相对路径（便携包用 ffmpeg.exe），统一解析成可执行文件的绝对路径 */
+            sFFmpegFilePath = VideoTools.Automation.FfmpegLocator.Resolve(sFFmpegFilePath) ?? sFFmpegFilePath;
             sVideoSaveFolder = config.Read("Program", "VideoSaveFloder");
 
             var gpuuse = config.Read("Program", "GpuUse");
@@ -273,6 +274,208 @@ namespace VideoTools
             config = null;
 
             isInited = true;
+
+            /* 沿用上一次各功能面板的参数 */
+            LoadWorkbenchSettings();
+
+            /* 界面语言：默认跟随系统 */
+            var language = new IniConfig().Read("Program", "Language");
+            Lang.Current = string.IsNullOrEmpty(language) ? Lang.System : language;
+            Lang.Apply(this);
+            isLangInited = true;
+            comboBoxSettingLanguage.SelectedIndex = Lang.Current == Lang.English ? 2 : (Lang.Current == Lang.Chinese ? 1 : 0);
+        }
+
+        /* 切换界面语言：立即生效并写入配置 */
+        private void ComboBoxSettingLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!isLangInited) return;
+            var index = comboBoxSettingLanguage.SelectedIndex;
+            Lang.Current = index == 2 ? Lang.English : (index == 1 ? Lang.Chinese : Lang.System);
+            new IniConfig().Write("Program", "Language", Lang.Current);
+            Lang.Apply(this);
+            RefreshAutomationPanel();
+        }
+
+        /* 工作台: 关闭窗口时保存各面板参数 */
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            SaveWorkbenchSettings();
+        }
+
+        private void SaveWorkbenchSettings()
+        {
+            try
+            {
+                var ini = new IniConfig();
+                ini.Write("Workbench", "CompressCodec", videoCodeChoose);
+                ini.Write("Workbench", "CompressCrf", Math.Round(sliderCompressCrf.Value).ToString(CultureInfo.InvariantCulture));
+                ini.Write("Workbench", "ConvertFormat", sVideoFormat.TrimStart('.'));
+                ini.Write("Workbench", "GifFormat", sAnimatedImageFormat.TrimStart('.'));
+                ini.Write("Workbench", "GifFps", textBox_Gif_Fps.Text);
+                ini.Write("Workbench", "GifWidth", textBox_Gif_Width.Text);
+                ini.Write("Workbench", "GifHeight", textBox_Gif_Height.Text);
+                ini.Write("Workbench", "GifLoop", checkBox_Gif_Loop.IsChecked == true ? "enable" : "disable");
+                ini.Write("Workbench", "GifPalette", checkBox_Gif_EnablePalettegen.IsChecked == true ? "enable" : "disable");
+                ini.Write("Workbench", "GifStart", txtStartTime.Text);
+                ini.Write("Workbench", "GifEnd", txtEndTime.Text);
+                ini.Write("Workbench", "CutStart", cut_start_time.Text);
+                ini.Write("Workbench", "CutEnd", cut_end_time.Text);
+                ini.Write("Workbench", "SpeedRate", sliderMultiple.Value.ToString("0.##", CultureInfo.InvariantCulture));
+                ini.Write("Workbench", "SpeedAudio", checkBox_Multiple_AccelerateAudio.IsChecked == true ? "enable" : "disable");
+                ini.Write("Workbench", "ResizeWidth", textBox_Size_Width.Text);
+                ini.Write("Workbench", "ResizeHeight", textBox_Size_Height.Text);
+
+                string voice = "extract";
+                if (radiobtnVoiceDelete.IsChecked == true)
+                {
+                    voice = "delete";
+                }
+                else if (radiobtnVoiceReplace.IsChecked == true)
+                {
+                    voice = "replace";
+                }
+                ini.Write("Workbench", "VoiceAction", voice);
+            }
+            catch { }
+        }
+
+        /* 启动时恢复上一次保存的面板参数；没有记录则保持默认值 */
+        private void LoadWorkbenchSettings()
+        {
+            try
+            {
+                var ini = new IniConfig();
+
+                /* 视频压缩：编码器与 CRF */
+                SelectRadioByTag(compressPanel, ini.Read("Workbench", "CompressCodec"), RadioBtn_CompressChoose_Click);
+                double crf;
+                if (TryParseWorkbenchDouble(ini.Read("Workbench", "CompressCrf"), out crf))
+                {
+                    if (crf < sliderCompressCrf.Minimum) crf = sliderCompressCrf.Minimum;
+                    if (crf > sliderCompressCrf.Maximum) crf = sliderCompressCrf.Maximum;
+                    sliderCompressCrf.Value = crf;
+                    sCrf = Math.Round(crf).ToString(CultureInfo.InvariantCulture);
+                    textBoxCompressCrf.Text = sCrf;
+                }
+
+                /* 格式转换：目标格式 */
+                SelectRadioByTag(convertPanel, ini.Read("Workbench", "ConvertFormat"), RadioBtn_ConvertChoose_Click);
+
+                /* 动图：格式、帧率、尺寸、循环、着色器、区间 */
+                string gifFormat = ini.Read("Workbench", "GifFormat");
+                if (gifFormat == "webp")
+                {
+                    radioGifFormatWebp.IsChecked = true;
+                    sAnimatedImageFormat = ".webp";
+                }
+                else if (gifFormat == "gif")
+                {
+                    radioGifFormatGif.IsChecked = true;
+                    sAnimatedImageFormat = ".gif";
+                }
+                double fps;
+                if (TryParseWorkbenchDouble(ini.Read("Workbench", "GifFps"), out fps))
+                {
+                    if (fps < sliderGifFps.Minimum) fps = sliderGifFps.Minimum;
+                    if (fps > sliderGifFps.Maximum) fps = sliderGifFps.Maximum;
+                    sliderGifFps.Value = fps;
+                    textBox_Gif_Fps.Text = Math.Round(fps).ToString(CultureInfo.InvariantCulture);
+                }
+                SetWorkbenchText(textBox_Gif_Width, ini.Read("Workbench", "GifWidth"));
+                SetWorkbenchText(textBox_Gif_Height, ini.Read("Workbench", "GifHeight"));
+                string gifLoop = ini.Read("Workbench", "GifLoop");
+                if (!string.IsNullOrEmpty(gifLoop))
+                {
+                    checkBox_Gif_Loop.IsChecked = gifLoop == "enable";
+                }
+                string gifPalette = ini.Read("Workbench", "GifPalette");
+                if (!string.IsNullOrEmpty(gifPalette))
+                {
+                    checkBox_Gif_EnablePalettegen.IsChecked = gifPalette == "enable";
+                }
+                SetWorkbenchText(txtStartTime, ini.Read("Workbench", "GifStart"));
+                SetWorkbenchText(txtEndTime, ini.Read("Workbench", "GifEnd"));
+
+                /* 视频裁剪：起止时间 */
+                SetWorkbenchText(cut_start_time, ini.Read("Workbench", "CutStart"));
+                SetWorkbenchText(cut_end_time, ini.Read("Workbench", "CutEnd"));
+
+                /* 视频加速：倍率与是否加速音频 */
+                double rate;
+                if (TryParseWorkbenchDouble(ini.Read("Workbench", "SpeedRate"), out rate))
+                {
+                    if (rate < sliderMultiple.Minimum) rate = sliderMultiple.Minimum;
+                    if (rate > sliderMultiple.Maximum) rate = sliderMultiple.Maximum;
+                    sliderMultiple.Value = rate;
+                    textBoxMultiple.Text = rate.ToString("0.##", CultureInfo.InvariantCulture);
+                }
+                string speedAudio = ini.Read("Workbench", "SpeedAudio");
+                if (!string.IsNullOrEmpty(speedAudio))
+                {
+                    checkBox_Multiple_AccelerateAudio.IsChecked = speedAudio == "enable";
+                }
+
+                /* 修改尺寸：目标宽高 */
+                SetWorkbenchText(textBox_Size_Width, ini.Read("Workbench", "ResizeWidth"));
+                SetWorkbenchText(textBox_Size_Height, ini.Read("Workbench", "ResizeHeight"));
+
+                /* 音频处理：上一次选择的动作 */
+                string voice = ini.Read("Workbench", "VoiceAction");
+                if (voice == "delete")
+                {
+                    radiobtnVoiceDelete.IsChecked = true;
+                }
+                else if (voice == "replace")
+                {
+                    radiobtnVoiceReplace.IsChecked = true;
+                }
+                else if (voice == "extract")
+                {
+                    radiobtnVoiceExtract.IsChecked = true;
+                }
+                if (!string.IsNullOrEmpty(voice))
+                {
+                    RadioBtn_VoiceAction_Click(null, null);
+                }
+            }
+            catch { }
+        }
+
+        private static bool TryParseWorkbenchDouble(string text, out double value)
+        {
+            return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static void SetWorkbenchText(TextBox box, string text)
+        {
+            if (!string.IsNullOrEmpty(text))
+            {
+                box.Text = text;
+            }
+        }
+
+        /* 按 Tag 选中单选项并执行其点击逻辑（代码设置 IsChecked 不会触发 Click） */
+        private static void SelectRadioByTag(Panel panel, string tag, Action<object, RoutedEventArgs> handler)
+        {
+            if (string.IsNullOrEmpty(tag))
+            {
+                return;
+            }
+            foreach (var child in panel.Children)
+            {
+                var radio = child as RadioButton;
+                if (radio != null && radio.Tag != null &&
+                    string.Equals(radio.Tag.ToString(), tag, StringComparison.OrdinalIgnoreCase))
+                {
+                    radio.IsChecked = true;
+                    if (handler != null)
+                    {
+                        handler(radio, null);
+                    }
+                    return;
+                }
+            }
         }
 
         /* 全局: 播放视频 */
@@ -440,6 +643,23 @@ namespace VideoTools
             e.Handled = true;
         }
 
+        /* 侧边栏：格式转换的“批量转换”子项展开/收起 */
+        private void ToggleConvertSub_Click(object sender, RoutedEventArgs e)
+        {
+            isConvertSubExpanded = !isConvertSubExpanded;
+            var panel = this.FindName("convertSubPanel") as FrameworkElement;
+            var arrow = this.FindName("txtConvertArrow") as TextBlock;
+            if (panel != null)
+            {
+                panel.Visibility = isConvertSubExpanded ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (arrow != null)
+            {
+                arrow.Text = isConvertSubExpanded ? "⯅" : "⯆";
+            }
+            e.Handled = true;
+        }
+
         private void UpdateVideoAreaForBatchMode()
         {
             if (isBatchMode)
@@ -591,17 +811,10 @@ namespace VideoTools
             mediaPlayer.Volume = volumeSlider.Value;
         }
 
-        /* 视频窗口: 计算基准比特率 */
-        private double CalculateBaseBitrate(double height)
+        /* 视频窗口: 计算基准比特率（与自动化共用同一套规则：按画面短边取档，竖屏按 1080 计） */
+        private double CalculateBaseBitrate(double width, double height)
         {
-            // 根据高度计算基准比特率
-            if (height <= 320) return 0.75; // 320p 或更低
-            if (height <= 480) return 1.5;  // 480p
-            if (height <= 720) return 3.0;  // 720p
-            if (height <= 1080) return 5.0; // 1080p
-            if (height <= 1440) return 10.0; // 1440p
-            if (height <= 2160) return 20.0; // 2160p（4K）
-            return 20.0; // 高于 4K
+            return VideoTools.Automation.BitratePolicy.BaseMbps((int)width, (int)height);
         }
 
         /* 视频窗口: 视频加载成功 */
@@ -628,7 +841,7 @@ namespace VideoTools
 
             if (mediaPlayer.NaturalDuration.HasTimeSpan)
             {
-                baseBitrate = CalculateBaseBitrate(videoHeight);
+                baseBitrate = CalculateBaseBitrate(videoWidth, videoHeight);
                 progressSlider.Maximum = mediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
                 /* 导入后初始化裁剪范围与文本框 */
                 cut_start_time.Text = "00:00:00";
@@ -696,12 +909,18 @@ namespace VideoTools
                 panelName = "compressPanel"; // 使用压缩面板配置
                 sToolChoose = "compress";    // 复用压缩逻辑
             }
+            else if ("convert_batch" == tag)
+            {
+                isBatchMode = true;
+                panelName = "convertPanel";  // 使用格式转换面板配置
+                sToolChoose = "convert";     // 复用转换逻辑
+            }
             else
             {
                 isBatchMode = false;
             }
 
-            if ("setting" != sToolChoose)
+            if ("setting" != sToolChoose && "automation" != sToolChoose)
             {
                 videoPlayerFrom.Visibility = Visibility.Visible;
             }
@@ -725,9 +944,194 @@ namespace VideoTools
 
                 /* 显示当前面板 */
                 panel.Visibility = Visibility.Visible;
+                if ("automation" == tag) RefreshAutomationPanel();
             }
 
             UpdateVideoAreaForBatchMode();
+        }
+
+        /* AI 自动化面板：展示 MCP 路径与可复制的客户端配置 */
+        private void RefreshAutomationPanel()
+        {
+            var mcpPath = VideoTools.Automation.AppPaths.FindMcpExecutable();
+            textBoxAutomationMcpPath.Text = mcpPath;
+
+            var exists = File.Exists(mcpPath);
+            textBlockAutomationStatus.Text = exists
+                ? Lang.T("状态：已就绪，AI 工具可直接连接")
+                : Lang.T("状态：未找到 videotools-mcp.exe，请确认 automation 文件夹与主程序同目录");
+            textBlockAutomationStatus.Foreground = exists ? Brushes.SeaGreen : Brushes.IndianRed;
+
+            textBoxAutomationCommands.Text =
+                ".\\videotools.exe probe \"D:\\video.mp4\"\r\n" +
+                ".\\videotools.exe compress \"D:\\video.mp4\" --crf 28 --output-dir \"D:\\out\"\r\n" +
+                ".\\videotools.exe trim \"D:\\video.mp4\" --start 00:00:05 --duration 10\r\n" +
+                ".\\videotools.exe batch --files a.mp4,b.mp4 --operation compress --params '{\\\"crf\\\":30}'\r\n" +
+                ".\\videotools.exe setup mcp --client claude --install";
+        }
+
+        private void BtnAutomationCopyCursor_Click(object sender, RoutedEventArgs e)
+        {
+            CopyAutomationConfig("cursor");
+        }
+
+        private void BtnAutomationCopyClaude_Click(object sender, RoutedEventArgs e)
+        {
+            CopyAutomationConfig("claude");
+        }
+
+        private void BtnAutomationCopyCodex_Click(object sender, RoutedEventArgs e)
+        {
+            CopyAutomationConfig("codex");
+        }
+
+        /* 用 Win32 直接写剪贴板：被其他程序占用时 OpenClipboard 立即返回失败，
+           不会像 WPF Clipboard 那样在界面线程里长时间重试导致卡死 */
+        private const uint CfUnicodeText = 13;
+        private const uint GmemMoveable = 0x0002;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool CloseClipboard();
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool EmptyClipboard();
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GlobalLock(IntPtr hMem);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GlobalUnlock(IntPtr hMem);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GlobalFree(IntPtr hMem);
+
+        private static bool TrySetClipboardOnce(string text)
+        {
+            if (!OpenClipboard(IntPtr.Zero)) return false;
+            var handle = IntPtr.Zero;
+            try
+            {
+                if (!EmptyClipboard()) return false;
+                var bytes = (uint)((text.Length + 1) * sizeof(char));
+                handle = GlobalAlloc(GmemMoveable, new UIntPtr(bytes));
+                if (handle == IntPtr.Zero) return false;
+                var target = GlobalLock(handle);
+                if (target == IntPtr.Zero) return false;
+                try
+                {
+                    Marshal.Copy(text.ToCharArray(), 0, target, text.Length);
+                    Marshal.WriteInt16(target, text.Length * sizeof(char), 0);
+                }
+                finally
+                {
+                    GlobalUnlock(handle);
+                }
+                if (SetClipboardData(CfUnicodeText, handle) == IntPtr.Zero) return false;
+                handle = IntPtr.Zero; /* 数据所有权已交给系统 */
+                return true;
+            }
+            finally
+            {
+                if (handle != IntPtr.Zero) GlobalFree(handle);
+                CloseClipboard();
+            }
+        }
+
+        /* 在后台线程重试并复制，界面保持响应 */
+        private void CopyTextToClipboard(string text, string successMessage, string failureMessage)
+        {
+            textBlockAutomationStatus.Foreground = Brushes.DimGray;
+            textBlockAutomationStatus.Text = "正在复制…";
+            var thread = new Thread(() =>
+            {
+                var copied = false;
+                for (var attempt = 0; attempt < 20 && !copied; attempt++)
+                {
+                    copied = TrySetClipboardOnce(text);
+                    if (!copied) Thread.Sleep(40);
+                }
+                try
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        textBlockAutomationStatus.Text = copied ? successMessage : failureMessage;
+                        textBlockAutomationStatus.Foreground = copied ? Brushes.SeaGreen : Brushes.IndianRed;
+                    }));
+                }
+                catch (Exception)
+                {
+                    // 窗口已关闭时忽略
+                }
+            });
+            thread.IsBackground = true;
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+        }
+
+        /* 剪贴板不可用时把配置落盘，AI 可以直接读文件，无需粘贴 */
+        private static string SaveSnippetToFile(string client, string snippet)
+        {
+            var extension = "codex" == client ? ".toml" : ".json";
+            var path = IOPath.Combine(VideoTools.Automation.AppPaths.DataDirectory, "mcp-config" + extension);
+            File.WriteAllText(path, snippet, new UTF8Encoding(false));
+            return path;
+        }
+
+        private void CopyAutomationConfig(string client)
+        {
+            try
+            {
+                var config = new VideoTools.Automation.IniConfig();
+                var ffmpeg = VideoTools.Automation.FfmpegLocator.Resolve(config, sFFmpegFilePath);
+                var snippet = "codex" == client
+                    ? VideoTools.Automation.Mcp.McpConfig.BuildCodexToml(ffmpeg)
+                    : VideoTools.Automation.Mcp.McpConfig.BuildClientJson(ffmpeg);
+                var saved = SaveSnippetToFile(client, snippet);
+                string doneText = "cursor" == client
+                    ? "已复制通用配置（JSON）。粘贴到 Cursor、Trae、WorkBuddy、Cherry Studio 等工具的 mcpServers 中即可。"
+                    : "已复制 " + client + " 配置到剪贴板（同时保存到 data\\mcp-config），粘贴到对应客户端的 MCP 设置中即可。";
+                CopyTextToClipboard(
+                    snippet,
+                    doneText,
+                    "复制失败：剪贴板被其他程序占用。配置已保存到 " + saved + "，可让 AI 直接读取该文件。");
+            }
+            catch (Exception ex)
+            {
+                textBlockAutomationStatus.Text = "复制失败：" + ex.Message;
+                textBlockAutomationStatus.Foreground = Brushes.IndianRed;
+            }
+        }
+
+        private void BtnAutomationOpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var directory = System.IO.Path.GetDirectoryName(VideoTools.Automation.AppPaths.FindMcpExecutable());
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) Directory.CreateDirectory(directory);
+                if (!string.IsNullOrEmpty(directory)) Process.Start("explorer.exe", directory);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("打开目录失败：" + ex.Message);
+            }
+        }
+
+        private void BtnAutomationCopyCli_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                CopyTextToClipboard(
+                    VideoTools.Automation.AppPaths.FindCliExecutable(),
+                    "已复制 CLI 路径到剪贴板。",
+                    "复制失败：剪贴板被其他程序占用，请稍后重试。");
+            }
+            catch (Exception ex)
+            {
+                textBlockAutomationStatus.Text = "复制失败：" + ex.Message;
+                textBlockAutomationStatus.Foreground = Brushes.IndianRed;
+            }
         }
 
         /* ffmpeg: 判断ffmpeg文件是否存在 */
@@ -743,13 +1147,16 @@ namespace VideoTools
         }
 
         /* ffmpeg: 调用ffmpeg执行命令 */
-        public Int32 ffmpegProcess(CancellationToken cancellationToken, string sCmd)
+        public Int32 ffmpegProcess(CancellationToken cancellationToken, string sCmd, bool allowFallback = true)
         {
 
             if (!isFFmpegExist())
             {
                 return -1;
             }
+
+            lock (_ffmpegErrorLock) { _lastFfmpegError = ""; }
+            int exitCode = 0;
 
             var ffmpeg = new Process
             {
@@ -833,6 +1240,7 @@ namespace VideoTools
                 {
                     if (!string.IsNullOrEmpty(args.Data))
                     {
+                        CollectFfmpegError(args.Data);
                         bool isGifConversion = sCmd.Contains("palettegen") || sCmd.Contains("paletteuse");
 
                         if (isGifConversion)
@@ -893,13 +1301,132 @@ namespace VideoTools
 
                 ffmpeg.BeginErrorReadLine();
                 ffmpeg.WaitForExit();
+                exitCode = ffmpeg.HasExited ? ffmpeg.ExitCode : -1;
             }
             finally
             {
                 ffmpeg.Dispose();
             }
 
-            return 0;
+            /* 用户主动取消：保持原样，由调用方清理半成品 */
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return exitCode;
+            }
+
+            if (exitCode != 0)
+            {
+                /* 硬件编码失败（驱动/设备不支持）时自动回退 CPU 编码重试一次，避免只生成 0KB 文件 */
+                string cpuCmd = allowFallback ? BuildCpuFallbackCommand(sCmd) : null;
+                if (!string.IsNullOrEmpty(cpuCmd))
+                {
+                    WriteFfmpegErrorLog(sCmd, exitCode, "hardware-fallback");
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        textBoxOverlayRunning.Text = "硬件编码不可用，已自动改用 CPU 重试···";
+                    });
+                    return ffmpegProcess(cancellationToken, cpuCmd, false);
+                }
+
+                /* 失败时把 ffmpeg 的真实原因返回给界面，而不是静默结束 */
+                string detail = GetFfmpegErrorTail(1200);
+                WriteFfmpegErrorLog(sCmd, exitCode, "failed");
+                throw new Exception($"ffmpeg 处理失败（退出码 {exitCode}）" + (string.IsNullOrEmpty(detail) ? "" : "\n\n" + detail));
+            }
+
+            return exitCode;
+        }
+
+        /* 记录 ffmpeg 错误输出（只保留尾部，避免无限增长） */
+        private void CollectFfmpegError(string line)
+        {
+            lock (_ffmpegErrorLock)
+            {
+                _lastFfmpegError += line + "\n";
+                if (_lastFfmpegError.Length > 8000)
+                {
+                    _lastFfmpegError = _lastFfmpegError.Substring(_lastFfmpegError.Length - 8000);
+                }
+            }
+        }
+
+        private string GetFfmpegErrorTail(int maxLength)
+        {
+            string text;
+            lock (_ffmpegErrorLock) { text = _lastFfmpegError; }
+            if (string.IsNullOrEmpty(text))
+            {
+                return "";
+            }
+            if (text.Length > maxLength)
+            {
+                text = text.Substring(text.Length - maxLength);
+            }
+            return text.Trim();
+        }
+
+        /* 失败详情落盘，方便用户反馈问题时直接附上日志 */
+        private void WriteFfmpegErrorLog(string cmd, int exitCode, string stage)
+        {
+            try
+            {
+                string dir = IOPath.Combine(VideoTools.Automation.AppPaths.DataDirectory, "logs");
+                Directory.CreateDirectory(dir);
+                string file = IOPath.Combine(dir, $"ffmpeg-error-{DateTime.Now.ToString("yyMMdd-HHmmss")}.log");
+                var sb = new StringBuilder();
+                sb.AppendLine("time: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                sb.AppendLine("stage: " + stage);
+                sb.AppendLine("exitCode: " + exitCode.ToString());
+                sb.AppendLine("ffmpeg: " + sFFmpegFilePath);
+                sb.AppendLine("cmd: " + cmd);
+                sb.AppendLine();
+                sb.AppendLine(GetFfmpegErrorTail(8000));
+                File.WriteAllText(file, sb.ToString(), Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        /* 硬件编码器对 preset 的取值支持不同：AMF/QSV 传 medium 会直接报错，改用编码器默认值 */
+        private string BuildPresetArgument()
+        {
+            string code = sOutVideoCode ?? "";
+            if (code.IndexOf("_amf", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                code.IndexOf("_qsv", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return " ";
+            }
+            return " -preset medium ";
+        }
+
+        /* 把硬件编码命令改写为 CPU 编码命令；不是硬件编码时返回 null */
+        private string BuildCpuFallbackCommand(string cmd)
+        {
+            string result = cmd;
+            bool replaced = false;
+            var map = new Dictionary<string, string>
+            {
+                { "h264_nvenc", "libx264" }, { "h264_qsv", "libx264" }, { "h264_amf", "libx264" },
+                { "hevc_nvenc", "libx265" }, { "hevc_qsv", "libx265" }, { "hevc_amf", "libx265" },
+                { "av1_nvenc", "libsvtav1" }, { "av1_qsv", "libsvtav1" }, { "av1_amf", "libsvtav1" }
+            };
+            foreach (var kv in map)
+            {
+                if (result.Contains(kv.Key))
+                {
+                    result = result.Replace(kv.Key, kv.Value);
+                    replaced = true;
+                }
+            }
+            if (!replaced)
+            {
+                return null;
+            }
+
+            /* 硬件用的固定码率参数对 libx* 不合适，换成 CRF 25 */
+            result = System.Text.RegularExpressions.Regex.Replace(result, @"-b:v\s+[\d.]+M", "-crf 25");
+
+            /* 首次失败可能已留下同名半成品，重试时强制覆盖，避免 ffmpeg 等待确认而卡住 */
+            return "-y " + result;
         }
 
         /* ffmpeg: 根据不同事件组合不同的ffmpeg命令行参数 */
@@ -1000,9 +1527,20 @@ namespace VideoTools
             if (true == checkBox_Setting_GpuUse.IsChecked && isHardwareEncoder)
             {
                 sCompressFormat = $" -b:v ";
-                /* 当未能获取视频高度时（预览失败），回退一个合理的基准比特率以避免0M导致编码失败 */
-                double baseForCalc = baseBitrate > 0 ? baseBitrate : 5.0; // 默认按1080p基准
-                double targetBitrate = baseForCalc * Math.Pow(2, (25 - double.Parse(sCrf)) / 6.0) * 0.4;
+                /* 未能获取视频尺寸时（预览失败）按 1080p 基准回退，避免 0M 导致编码失败 */
+                double targetBitrate = baseBitrate > 0
+                    ? baseBitrate * Math.Pow(2, (25 - double.Parse(sCrf)) / 6.0) * 0.4
+                    : VideoTools.Automation.BitratePolicy.TargetMbps(1920, 1080, int.Parse(sCrf));
+                /* 与自动化保持一致：目标码率不超过源码率，避免“压缩后反而变大” */
+                if (!string.IsNullOrEmpty(sVideoFilePath) && File.Exists(sVideoFilePath) && mediaPlayer.NaturalDuration.HasTimeSpan)
+                {
+                    var seconds = mediaPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+                    if (seconds > 0)
+                    {
+                        var sourceKbps = (int)(new FileInfo(sVideoFilePath).Length * 8.0 / seconds / 1000.0);
+                        targetBitrate = VideoTools.Automation.BitratePolicy.CapToSource(targetBitrate, sourceKbps);
+                    }
+                }
                 sCompressFormat += targetBitrate.ToString("F2");
                 sCompressFormat += "M";
             }
@@ -1059,7 +1597,7 @@ namespace VideoTools
                 case "compress":
                     sCmd += sOutVideoCode;
                     sCmd += sCompressFormat; /* crf or bv */
-                    sCmd += " -preset medium -c:a copy ";
+                    sCmd += BuildPresetArgument() + " -c:a copy ";
                     break;
                 case "convert":
                     sCmd += sConvertVideoCode;
@@ -1156,7 +1694,7 @@ namespace VideoTools
                             // 指定视频/音频编码与压缩参数，避免默认编码体积暴涨
                             sCmd += sOutVideoCode;
                             sCmd += sCompressFormat; /* crf 或 bv */
-                            sCmd += " -preset medium ";
+                            sCmd += BuildPresetArgument();
                             // 根据容器选择合适的音频编码
                             string extLower = extension.ToLower();
                             if (extLower == ".webm")
@@ -1182,7 +1720,7 @@ namespace VideoTools
                             sCmd += $" -vf \"setpts={ptsFactor:0.##}*PTS\" -an ";
                             sCmd += sOutVideoCode;
                             sCmd += sCompressFormat; /* crf 或 bv */
-                            sCmd += " -preset medium ";
+                            sCmd += BuildPresetArgument();
                         }
                     }
                     else
@@ -1193,7 +1731,7 @@ namespace VideoTools
                             sCmd += " -filter_complex \"[0:v]setpts=PTS[v];[0:a]atempo=1.0[a]\" -map \"[v]\" -map \"[a]\" ";
                             sCmd += sOutVideoCode;
                             sCmd += sCompressFormat; /* crf 或 bv */
-                            sCmd += " -preset medium ";
+                            sCmd += BuildPresetArgument();
                             string extLower2 = extension.ToLower();
                             if (extLower2 == ".webm")
                             {
@@ -1217,7 +1755,7 @@ namespace VideoTools
                             sCmd += " -vf \"setpts=PTS\" -an ";
                             sCmd += sOutVideoCode;
                             sCmd += sCompressFormat; /* crf 或 bv */
-                            sCmd += " -preset medium ";
+                            sCmd += BuildPresetArgument();
                         }
                     }
                     break;
@@ -1294,9 +1832,64 @@ namespace VideoTools
         {
             if (isInited)
             {
-                sCrf = Math.Round(sliderCompressCrf.Value).ToString();
-                labelCompressCrf.Content = sCrf;
+                sCrf = Math.Round(sliderCompressCrf.Value).ToString(CultureInfo.InvariantCulture);
+                if (textBoxCompressCrf != null)
+                {
+                    textBoxCompressCrf.Text = sCrf;
+                }
             }
+        }
+
+        /* 滚轮微调：每格 ±1，避免拖拽对不准 */
+        private void CompressSlider_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (!isInited)
+            {
+                return;
+            }
+            double step = e.Delta > 0 ? 1 : -1;
+            double next = Math.Round(sliderCompressCrf.Value) + step;
+            if (next < sliderCompressCrf.Minimum) next = sliderCompressCrf.Minimum;
+            if (next > sliderCompressCrf.Maximum) next = sliderCompressCrf.Maximum;
+            sliderCompressCrf.Value = next;
+            e.Handled = true;
+        }
+
+        private void CompressCrfBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                ApplyCompressCrfFromText();
+                Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                textBoxCompressCrf.Text = sCrf;
+                Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+        }
+
+        private void CompressCrfBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            ApplyCompressCrfFromText();
+        }
+
+        /* 直接输入压缩率：越界自动夹紧，非数字还原 */
+        private void ApplyCompressCrfFromText()
+        {
+            int value;
+            if (!int.TryParse(textBoxCompressCrf.Text.Trim(), out value))
+            {
+                textBoxCompressCrf.Text = sCrf;
+                return;
+            }
+            if (value < sliderCompressCrf.Minimum) value = (int)sliderCompressCrf.Minimum;
+            if (value > sliderCompressCrf.Maximum) value = (int)sliderCompressCrf.Maximum;
+            sliderCompressCrf.Value = value;
+            sCrf = value.ToString(CultureInfo.InvariantCulture);
+            textBoxCompressCrf.Text = sCrf;
         }
 
         private void parseCompressVideoCode() {
@@ -1847,8 +2440,8 @@ namespace VideoTools
         {
             if (isInited)
             {
-                sCrf = Math.Round(sliderGifFps.Value).ToString();
-                textBox_Gif_Fps.Text = sCrf;
+                /* 动图帧率不能写到压缩用的 sCrf，否则后续压缩会误用该值 */
+                textBox_Gif_Fps.Text = Math.Round(sliderGifFps.Value).ToString(CultureInfo.InvariantCulture);
             }
         }
 
@@ -1910,8 +2503,8 @@ namespace VideoTools
         {
             if (isInited)
             {
-                sCrf = sliderMultiple.Value.ToString("F1");
-                textBoxMultiple.Text = sCrf;
+                /* 倍率不能写到压缩用的 sCrf，否则后续压缩会误用该值 */
+                textBoxMultiple.Text = sliderMultiple.Value.ToString("F1", CultureInfo.InvariantCulture);
             }
         }
 
@@ -2278,7 +2871,7 @@ namespace VideoTools
             {
                 if (batchFiles.Count == 0)
                 {
-                    MessageBox.Show("请先添加要批量压缩的文件！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("请先添加要批量处理的文件！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
             }

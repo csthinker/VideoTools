@@ -109,6 +109,9 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Lang.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -156,5 +159,19 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VideoTools.Automation\VideoTools.Automation.csproj">
+      <Project>{A1B2C3D4-0001-4E5F-9A01-000000000001}</Project>
+      <Name>VideoTools.Automation</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- 本机无 .NET 4.8 目标包时 MSBuild 会从 GAC 复制 mscorlib.dll 与 norm*.nlp，运行时应使用系统自带版本 -->
+  <Target Name="RemoveGacCopies" AfterTargets="Build">
+    <ItemGroup>
+      <StrayGacFile Include="$(TargetDir)mscorlib.dll" />
+      <StrayGacFile Include="$(TargetDir)norm*.nlp" />
+    </ItemGroup>
+    <Delete Files="@(StrayGacFile)" />
+  </Target>
 </Project>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1B2C3D4-0001-4E5F-9A01-000000000001}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>VideoTools.Automation</RootNamespace>
+    <AssemblyName>VideoTools.Automation</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <LangVersion>latest</LangVersion>
+    <FileAlignment>512</FileAlignment>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <DebugSymbols Condition=" '$(Configuration)' == 'Debug' ">true</DebugSymbols>
+    <DebugType Condition=" '$(Configuration)' == 'Debug' ">full</DebugType>
+    <Optimize Condition=" '$(Configuration)' == 'Release' ">true</Optimize>
+    <DefineConstants Condition=" '$(Configuration)' == 'Debug' ">DEBUG;TRACE</DefineConstants>
+    <DefineConstants Condition=" '$(Configuration)' == 'Release' ">TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Web.Extensions">
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Json.cs" />
+    <Compile Include="AppPaths.cs" />
+    <Compile Include="IniConfig.cs" />
+    <Compile Include="ToolException.cs" />
+    <Compile Include="MediaProbe.cs" />
+    <Compile Include="BitratePolicy.cs" />
+    <Compile Include="FfmpegRunner.cs" />
+    <Compile Include="CommandBuilder.cs" />
+    <Compile Include="AutomationService.cs" />
+    <Compile Include="Jobs.cs" />
+    <Compile Include="Mcp\McpConfig.cs" />
+    <Compile Include="Mcp\ToolCatalog.cs" />
+    <Compile Include="Mcp\McpServer.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- 本机无 .NET 4.8 目标包时 MSBuild 会从 GAC 复制 mscorlib.dll 与 norm*.nlp，运行时应使用系统自带版本 -->
+  <Target Name="RemoveGacCopies" AfterTargets="Build">
+    <ItemGroup>
+      <StrayGacFile Include="$(TargetDir)mscorlib.dll" />
+      <StrayGacFile Include="$(TargetDir)norm*.nlp" />
+    </ItemGroup>
+    <Delete Files="@(StrayGacFile)" />
+  </Target>
+</Project>

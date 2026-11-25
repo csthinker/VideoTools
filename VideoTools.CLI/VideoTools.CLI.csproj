@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1B2C3D4-0002-4E5F-9A01-000000000002}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>VideoTools.CLI</RootNamespace>
+    <AssemblyName>videotools</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <LangVersion>latest</LangVersion>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <DebugSymbols Condition=" '$(Configuration)' == 'Debug' ">true</DebugSymbols>
+    <DebugType Condition=" '$(Configuration)' == 'Debug' ">full</DebugType>
+    <Optimize Condition=" '$(Configuration)' == 'Release' ">true</Optimize>
+    <DefineConstants Condition=" '$(Configuration)' == 'Debug' ">DEBUG;TRACE</DefineConstants>
+    <DefineConstants Condition=" '$(Configuration)' == 'Release' ">TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Web.Extensions">
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VideoTools.Automation\VideoTools.Automation.csproj">
+      <Project>{A1B2C3D4-0001-4E5F-9A01-000000000001}</Project>
+      <Name>VideoTools.Automation</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="CopyToAppAutomationFolder" AfterTargets="Build">
+    <ItemGroup>
+      <AutomationOutput Include="$(TargetDir)videotools.exe" />
+      <AutomationOutput Include="$(TargetDir)videotools.pdb" Condition="Exists('$(TargetDir)videotools.pdb')" />
+      <AutomationOutput Include="$(TargetDir)VideoTools.Automation.dll" />
+      <AutomationOutput Include="$(TargetDir)VideoTools.Automation.pdb" Condition="Exists('$(TargetDir)VideoTools.Automation.pdb')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AutomationOutput)" DestinationFolder="$(MSBuildProjectDirectory)\..\VideoTools\bin\$(Configuration)\automation\" SkipUnchangedFiles="true" />
+  </Target>
+  <!-- 本机无 .NET 4.8 目标包时 MSBuild 会从 GAC 复制 mscorlib.dll 与 norm*.nlp，运行时应使用系统自带版本 -->
+  <Target Name="RemoveGacCopies" AfterTargets="Build">
+    <ItemGroup>
+      <StrayGacFile Include="$(TargetDir)mscorlib.dll" />
+      <StrayGacFile Include="$(TargetDir)norm*.nlp" />
+    </ItemGroup>
+    <Delete Files="@(StrayGacFile)" />
+  </Target>
+</Project>
