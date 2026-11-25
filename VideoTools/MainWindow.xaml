@@ -1,4 +1,4 @@
-<Window x:Class="VideoTools.MainWindow"
+﻿<Window x:Class="VideoTools.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -10,6 +10,7 @@
         WindowStyle="SingleBorderWindow"
         SizeToContent="WidthAndHeight"
         Loaded="Window_Loaded"
+        Closing="Window_Closing"
         AllowDrop="True" Drop="Window_Drop" WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <!-- 添加通用按钮样式 -->
@@ -183,7 +184,7 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-            <Setter Property="MinHeight" Value="44"/>
+            <Setter Property="MinHeight" Value="36"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
         </Style>
         <!-- 添加现代化Slider样式 -->
@@ -730,7 +731,8 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <StackPanel Grid.Row="0">
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
                 <TextBlock Foreground="#8F8F8F" FontSize="13" Margin="15 15 0 20"/>
                 <UniformGrid Columns="2">
                     <StackPanel Orientation="Horizontal" Margin="0,0,-89,0">
@@ -745,20 +747,67 @@
                                    FontWeight="Bold"/>
                     </StackPanel>
                 </UniformGrid>
-                <RadioButton x:Name="radiobtn_compress"  Tag="compress" GroupName="SidebarNav"
-                             Style="{DynamicResource RadioButtonStyle}" 
+
+                <!-- 格式转换（含批量转换子项，默认折叠） -->
+                <RadioButton x:Name="radiobtn_convert" Tag="convert" GroupName="SidebarNav"
+                             Style="{DynamicResource RadioButtonStyle}"
                              Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xe607;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
-                                   Margin="10 0 0 0" Foreground="#2196F3"/>
-                        <TextBlock Margin="10 0 0 0" Text="视频压缩"  FontSize="14" VerticalAlignment="Center" 
+                        <TextBlock Text="&#xe6d1;" FontFamily="./assets/fonts/#iconfont" FontSize="22" Width="24" TextAlignment="Center" VerticalAlignment="Center"
+                                   Margin="10 0 0 0" Foreground="#CD3700"/>
+                        <TextBlock Margin="10 0 0 0" Text="格式转换" FontSize="14" Width="90" VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={
                                             RelativeSource FindAncestor,
                                             AncestorLevel=1,
                                             AncestorType={x:Type RadioButton}
                                         }
                                     }" />
-                        <!-- 展开箭头：扩大点击区域并更换更醒目的箭头样式 -->
+                        <Button Click="ToggleConvertSub_Click"
+                                Style="{StaticResource SidebarArrowButtonStyle}"
+                                Margin="8,0,0,0" VerticalAlignment="Center"
+                                ToolTip="展开/收起">
+                            <TextBlock x:Name="txtConvertArrow" Text="⯆" FontSize="16"
+                                       Foreground="{Binding Foreground, RelativeSource={
+                                                RelativeSource FindAncestor,
+                                                AncestorLevel=2,
+                                                AncestorType={x:Type RadioButton}
+                                            }}"/>
+                        </Button>
+                    </StackPanel>
+                </RadioButton>
+
+                <StackPanel x:Name="convertSubPanel" Visibility="Collapsed">
+                    <RadioButton x:Name="radiobtn_convert_batch" Tag="convert_batch" GroupName="SidebarNav"
+                                 Style="{DynamicResource RadioButtonStyle}"
+                                 Click="RadioBtn_Compress_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xe6d1;" FontFamily="./assets/fonts/#iconfont" FontSize="16" Width="24" TextAlignment="Center" VerticalAlignment="Center"
+                                       Margin="28 0 0 0" Foreground="#CD3700"/>
+                            <TextBlock Margin="10 0 0 0" Text="批量转换" FontSize="13" VerticalAlignment="Center"
+                                       Foreground="{Binding Foreground, RelativeSource={
+                                                RelativeSource FindAncestor,
+                                                AncestorLevel=1,
+                                                AncestorType={x:Type RadioButton}
+                                            }
+                                        }" />
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+
+                <!-- 视频压缩（含批量压缩子项，默认折叠） -->
+                <RadioButton x:Name="radiobtn_compress" Tag="compress" GroupName="SidebarNav"
+                             Style="{DynamicResource RadioButtonStyle}"
+                             Click="RadioBtn_Compress_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xe607;" FontFamily="./assets/fonts/#iconfont" FontSize="22" Width="24" TextAlignment="Center" VerticalAlignment="Center"
+                                   Margin="10 0 0 0" Foreground="#2196F3"/>
+                        <TextBlock Margin="10 0 0 0" Text="视频压缩" FontSize="14" Width="90" VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={
+                                            RelativeSource FindAncestor,
+                                            AncestorLevel=1,
+                                            AncestorType={x:Type RadioButton}
+                                        }
+                                    }" />
                         <Button Click="ToggleCompressSub_Click"
                                 Style="{StaticResource SidebarArrowButtonStyle}"
                                 Margin="8,0,0,0" VerticalAlignment="Center"
@@ -773,13 +822,12 @@
                     </StackPanel>
                 </RadioButton>
 
-                <!-- 批量压缩入口：作为“视频压缩”的子项，默认折叠 -->
                 <StackPanel x:Name="compressSubPanel" Visibility="Collapsed">
                     <RadioButton x:Name="radiobtn_compress_batch" Tag="compress_batch" GroupName="SidebarNav"
                                  Style="{DynamicResource RadioButtonStyle}"
                                  Click="RadioBtn_Compress_Click">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xe6d1;" FontFamily="./assets/fonts/#iconfont" FontSize="20"
+                            <TextBlock Text="&#xe6d1;" FontFamily="./assets/fonts/#iconfont" FontSize="16" Width="24" TextAlignment="Center" VerticalAlignment="Center"
                                        Margin="28 0 0 0" Foreground="#2196F3"/>
                             <TextBlock Margin="10 0 0 0" Text="批量压缩" FontSize="13" VerticalAlignment="Center"
                                        Foreground="{Binding Foreground, RelativeSource={
@@ -793,30 +841,60 @@
                 </StackPanel>
 
                 <RadioButton Tag="cut" GroupName="SidebarNav"
-                     Style="{DynamicResource RadioButtonStyle}" 
-                     Click="RadioBtn_Compress_Click">
+                             Style="{DynamicResource RadioButtonStyle}"
+                             Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xe948;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
-                           Margin="10 0 0 0" Foreground="#1E1E1E"/>
-                        <TextBlock Margin="10 0 0 0" Text="视频裁剪"  FontSize="14" VerticalAlignment="Center" 
-                           Foreground="{Binding Foreground, RelativeSource={
-                                    RelativeSource FindAncestor,
-                                    AncestorLevel=1,
-                                    AncestorType={x:Type RadioButton}
-                                }
-                            }" />
+                        <TextBlock Text="&#xe948;" FontFamily="./assets/fonts/#iconfont" FontSize="22" Width="24" TextAlignment="Center" VerticalAlignment="Center"
+                                   Margin="10 0 0 0" Foreground="#1E1E1E"/>
+                        <TextBlock Margin="10 0 0 0" Text="视频裁剪" FontSize="14" VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={
+                                            RelativeSource FindAncestor,
+                                            AncestorLevel=1,
+                                            AncestorType={x:Type RadioButton}
+                                        }
+                                    }" />
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton Tag="convert" GroupName="SidebarNav"
+                <RadioButton Tag="multiple" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xe6d1;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
-                                   Margin="10 0 0 0" Foreground="#CD3700"/>
-                        <TextBlock  Margin="10 0 0 0" Text="格式转换"  FontSize="14" VerticalAlignment="Center"
+                        <TextBlock Text="&#xf0de;" FontFamily="./assets/fonts/#iconfont" FontSize="22" Width="24" TextAlignment="Center" VerticalAlignment="Center"
+                                   Margin="10 0 0 0" Foreground="#E59151"/>
+                        <TextBlock Margin="10 0 0 0" Text="视频加速" FontSize="14" VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={
-                                            RelativeSource FindAncestor, 
-                                            AncestorLevel=1, 
+                                            RelativeSource FindAncestor,
+                                            AncestorLevel=1,
+                                            AncestorType={x:Type RadioButton}
+                                        }
+                                    }" />
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton Tag="resize" GroupName="SidebarNav"
+                             Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xe600;" FontFamily="./assets/fonts/#iconfont" FontSize="22" Width="24" TextAlignment="Center" VerticalAlignment="Center"
+                                   Margin="10 0 0 0" Foreground="#FF5F5F" />
+                        <TextBlock Margin="10 0 0 0" Text="修改尺寸" FontSize="14" VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={
+                                            RelativeSource FindAncestor,
+                                            AncestorLevel=1,
+                                            AncestorType={x:Type RadioButton}
+                                        }
+                                    }" />
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton Tag="voice" GroupName="SidebarNav"
+                             Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xe67f;" FontFamily="./assets/fonts/#iconfont" FontSize="22" Width="24" TextAlignment="Center" VerticalAlignment="Center"
+                                   Margin="10 0 0 0" Foreground="#A57BD7" />
+                        <TextBlock Margin="10 0 0 0" Text="音频处理" FontSize="14" VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={
+                                            RelativeSource FindAncestor,
+                                            AncestorLevel=1,
                                             AncestorType={x:Type RadioButton}
                                         }
                                     }" />
@@ -826,51 +904,37 @@
                 <RadioButton Tag="gif" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xe686;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
+                        <TextBlock Text="&#xe686;" FontFamily="./assets/fonts/#iconfont" FontSize="22" Width="24" TextAlignment="Center" VerticalAlignment="Center"
                                    Margin="10 0 0 0" Foreground="Green"/>
-                        <TextBlock  Margin="10 0 0 0" Text="转动图"  FontSize="14" VerticalAlignment="Center"
+                        <TextBlock Margin="10 0 0 0" Text="转动图" FontSize="14" VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={
-                                    RelativeSource FindAncestor, AncestorLevel=1, AncestorType={x:Type RadioButton}}}" />
+                                            RelativeSource FindAncestor,
+                                            AncestorLevel=1,
+                                            AncestorType={x:Type RadioButton}
+                                        }
+                                    }" />
                     </StackPanel>
                 </RadioButton>
 
-                <RadioButton Tag="multiple" GroupName="SidebarNav"
+                <RadioButton Tag="automation" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xf0de;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
-                                   Margin="10 0 0 0" Foreground="#E59151"/>
-                        <TextBlock  Margin="10 0 0 0" Text="视频加速"  FontSize="14" VerticalAlignment="Center"
+                        <TextBlock Text="AI" FontSize="18" FontWeight="Bold" Width="24" TextAlignment="Center"
+                                   Margin="10,0,0,0" Foreground="#2E9E5B" VerticalAlignment="Center"/>
+                        <TextBlock Margin="10,0,0,0" Text="自动化" FontSize="14" VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={
-                                    RelativeSource FindAncestor, AncestorLevel=1, AncestorType={x:Type RadioButton}}}" />
-                    </StackPanel>
-                </RadioButton>
-
-                <RadioButton Tag="resize" GroupName="SidebarNav"
-                             Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xe600;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
-                                   Margin="10 0 0 0" Foreground="#FF5F5F" />
-                        <TextBlock  Margin="10 0 0 0" Text="修改尺寸"  FontSize="14" VerticalAlignment="Center"
-                                   Foreground="{Binding Foreground, RelativeSource={
-                                    RelativeSource FindAncestor, AncestorLevel=1, AncestorType={x:Type RadioButton}}}" />
-                    </StackPanel>
-                </RadioButton>
-
-                <RadioButton Tag="voice" GroupName="SidebarNav"
-                             Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xe67f;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
-                                   Margin="10 0 0 0" Foreground="#A57BD7" />
-                        <TextBlock  Margin="10 0 0 0" Text="音频处理"  FontSize="14" VerticalAlignment="Center"
-                                   Foreground="{Binding Foreground, RelativeSource={
-                                    RelativeSource FindAncestor, AncestorLevel=1, AncestorType={x:Type RadioButton}}}" />
+                                            RelativeSource FindAncestor,
+                                            AncestorLevel=1,
+                                            AncestorType={x:Type RadioButton}
+                                        }
+                                    }" />
                     </StackPanel>
                 </RadioButton>
 
                 <RadioButton x:Name="radiobtn_setting" Tag="setting" GroupName="SidebarNav"
                              Style="{DynamicResource RadioButtonStyle}" Click="RadioBtn_Compress_Click" >
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xea6b;" FontFamily="./assets/fonts/#iconfont" FontSize="22" 
+                        <TextBlock Text="&#xea6b;" FontFamily="./assets/fonts/#iconfont" FontSize="22" Width="24" TextAlignment="Center" VerticalAlignment="Center" 
                                    Margin="10 0 0 0" Foreground="#6074C2" />
                         <TextBlock  Margin="10 0 0 0" Text="设置"  FontSize="14" VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={
@@ -878,6 +942,7 @@
                     </StackPanel>
                 </RadioButton>
             </StackPanel>
+            </ScrollViewer>
             <!-- 固定在侧边栏底部的关于按钮 -->
             <Button x:Name="btnAbout"
                     Grid.Row="1"
@@ -907,11 +972,18 @@
                 <Label Content="CRF值越高，视频质量损失越高，文件体积越小" HorizontalAlignment="Left" Margin="22,102,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.538,0.56" Width="417" FontSize="16"/>
                 <Slider x:Name="sliderCompressCrf" Style="{StaticResource ModernSliderStyle}"
                         HorizontalAlignment="Left" Margin="28,145,0,0" VerticalAlignment="Top" Width="357" Maximum="50" Value="25"
+                        IsMoveToPointEnabled="True" IsSnapToTickEnabled="True" TickFrequency="1"
+                        SmallChange="1" LargeChange="5"
+                        PreviewMouseWheel="CompressSlider_PreviewMouseWheel"
                         ValueChanged="CompressSlider_ValueChanged"/>
                 <Label Content="无损" HorizontalAlignment="Left" Margin="22,167,0,0" VerticalAlignment="Top"/>
                 <Label Content="推荐" HorizontalAlignment="Left" Margin="190,167,0,0" VerticalAlignment="Top" RenderTransformOrigin="4.765,0.48"/>
                 <Label Content="质量损失较高" HorizontalAlignment="Left" Margin="319,167,0,0" VerticalAlignment="Top" RenderTransformOrigin="4.765,0.48" Width="101"/>
-                <Label x:Name="labelCompressCrf" Content="25" HorizontalAlignment="Left" Margin="390,139,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.375,0.36" FontSize="16"/>
+                <TextBox x:Name="textBoxCompressCrf" Text="25" HorizontalAlignment="Left" Margin="388,140,0,0" VerticalAlignment="Top"
+                         Width="46" Height="26" FontSize="15" TextAlignment="Center" VerticalContentAlignment="Center"
+                         BorderBrush="#E0E0E0" BorderThickness="1" Background="White"
+                         ToolTip="可直接输入 0-50，回车生效"
+                         KeyDown="CompressCrfBox_KeyDown" LostFocus="CompressCrfBox_LostFocus"/>
                 <Button Content="开始处理" Style="{StaticResource ModernButtonStyle}" 
                         HorizontalAlignment="Left" Margin="485,195,0,0" VerticalAlignment="Top" Width="100" Height="36" 
                         RenderTransformOrigin="0.12,0.579" 
@@ -1221,41 +1293,68 @@
 
             <!-- 设置面板 -->
             <Grid x:Name="settingPanel" Visibility="Collapsed" Margin="0,10,0,0">
-                <Label Content="ffmpeg程序路径" HorizontalAlignment="Left" Margin="19,114,0,0" VerticalAlignment="Top" Width="130" FontSize="14" FontWeight="Bold"/>
-                <TextBox x:Name="textBoxSettingFmmpegPath" HorizontalAlignment="Left" Height="30" Margin="24,152,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="328" FontSize="14"/>
+                <Label Content="ffmpeg程序路径" HorizontalAlignment="Left" Margin="19,159,0,0" VerticalAlignment="Top" Width="130" FontSize="14" FontWeight="Bold"/>
+                <TextBox x:Name="textBoxSettingFmmpegPath" HorizontalAlignment="Left" Height="30" Margin="24,197,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="328" FontSize="14" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
                 <Button Content="在线下载" Style="{StaticResource ModernSecondaryButtonStyle}" 
-                        HorizontalAlignment="Left" Margin="463,152,0,0" VerticalAlignment="Top" Width="85" Height="30" 
+                        HorizontalAlignment="Left" Margin="463,197,0,0" VerticalAlignment="Top" Width="85" Height="30" 
                         Click="BtnSettingDownload_Click"/>
                 <Button Content="手动选择" Style="{StaticResource ModernSecondaryButtonStyle}" 
-                        HorizontalAlignment="Left" Margin="364,152,0,0" VerticalAlignment="Top" 
+                        HorizontalAlignment="Left" Margin="364,197,0,0" VerticalAlignment="Top" 
                         Width="85" Height="30" Click="BtnSettingChoose_Click" />
-                <Label Content="视频处理功能依赖于ffmepg，请自行配置或者选择自动联网下载" HorizontalAlignment="Left" Margin="136,117,0,0" VerticalAlignment="Top" Width="371" FontSize="11"/>
+                <Label Content="视频处理功能依赖于ffmepg，请自行配置或者选择自动联网下载" HorizontalAlignment="Left" Margin="136,162,0,0" VerticalAlignment="Top" Width="371" FontSize="11"/>
                 <Label x:Name="labelSettingInfo" Content="" HorizontalAlignment="Left" HorizontalContentAlignment="Center"  VerticalAlignment="Top" Margin="485,452,0,0" Width="100"/>
                 <Button Content="保存" Style="{StaticResource ModernButtonStyle}" 
                         HorizontalAlignment="Left" Margin="485,482,0,0" 
                         VerticalAlignment="Top" Width="100" RenderTransformOrigin="0.12,0.579" 
                         Height="36" Click="BtnSettingSave_Click"/>
-                <Label Content="视频文件输出路径" HorizontalAlignment="Left" Margin="19,191,0,0" VerticalAlignment="Top" Width="130" FontSize="14" FontWeight="Bold"/>
-                <TextBox x:Name="textBoxVideoDir" HorizontalAlignment="Left" Height="30" Margin="24,224,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="328" FontSize="14"/>
-                <Button x:Name="btnSettingChooseDir" Content="选择目录" Style="{StaticResource ModernSecondaryButtonStyle}" HorizontalAlignment="Left" Margin="364,224,0,0" VerticalAlignment="Top" Width="86" Height="30" Click="BtnSettingChooseDir_Click" />
+                <Label Content="视频文件输出路径" HorizontalAlignment="Left" Margin="19,236,0,0" VerticalAlignment="Top" Width="130" FontSize="14" FontWeight="Bold"/>
+                <TextBox x:Name="textBoxVideoDir" HorizontalAlignment="Left" Height="30" Margin="24,269,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="328" FontSize="14" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                <Button x:Name="btnSettingChooseDir" Content="选择目录" Style="{StaticResource ModernSecondaryButtonStyle}" HorizontalAlignment="Left" Margin="364,269,0,0" VerticalAlignment="Top" Width="86" Height="30" Click="BtnSettingChooseDir_Click" />
                 <CheckBox x:Name="checkBox_Setting_GpuUse" 
                           Content="启用GPU加速" HorizontalAlignment="Left"
-                          Margin="26,35,0,0" VerticalAlignment="Top" 
+                          Margin="26,80,0,0" VerticalAlignment="Top" 
                           FontSize="16" IsChecked="True"
                           Click="CheckBoxGpu_Click">
                     <CheckBox.ToolTip>请务必确保你选择的显卡类型与你电脑匹配，否则可能会无法进行视频处理！</CheckBox.ToolTip>
                 </CheckBox>
                 <CheckBox x:Name="checkBox_Setting_CpuMax" 
                           Content="最大CPU利用率" HorizontalAlignment="Left" 
-                          Margin="26,72,0,0" VerticalAlignment="Top" FontSize="16">
+                          Margin="26,117,0,0" VerticalAlignment="Top" FontSize="16">
                     <CheckBox.ToolTip>勾选将使用允许的最大资源进行处理! 默认使用一半资源!</CheckBox.ToolTip>
                 </CheckBox>
-                <ComboBox x:Name="comboBox_Setting_GpuSelect" HorizontalAlignment="Left" Margin="169,34,0,0" 
+                <ComboBox x:Name="comboBox_Setting_GpuSelect" HorizontalAlignment="Left" Margin="169,79,0,0" 
                         VerticalAlignment="Top" Width="100" Visibility="Visible">
                     <ComboBoxItem Content="Intel"/>
                     <ComboBoxItem Content="Nvidia"/>
                     <ComboBoxItem Content="AMD"/>
                 </ComboBox>
+                <Label Content="设置" HorizontalAlignment="Left" Margin="19,34,0,0" VerticalAlignment="Top" Width="130" FontSize="14" FontWeight="Bold"/>
+                <ComboBox x:Name="comboBoxSettingLanguage" HorizontalAlignment="Left" Margin="169,36,0,0"
+                          VerticalAlignment="Top" Width="160" Height="28" SelectionChanged="ComboBoxSettingLanguage_SelectionChanged">
+                    <ComboBoxItem Content="跟随系统"/>
+                    <ComboBoxItem Content="简体中文"/>
+                    <ComboBoxItem Content="English"/>
+                </ComboBox>
+            </Grid>
+
+            <!-- AI 自动化（MCP / CLI）面板 -->
+            <Grid x:Name="automationPanel" Visibility="Collapsed" Margin="0,10,0,0">
+                <Label Content="自动化（MCP / CLI）" HorizontalAlignment="Left" Margin="19,8,0,0" VerticalAlignment="Top" FontSize="18" FontWeight="Bold"/>
+                <TextBlock TextWrapping="Wrap" Width="520" HorizontalAlignment="Left" Margin="24,44,0,0" VerticalAlignment="Top" FontSize="12" Foreground="#666666" LineHeight="19"
+                           Text="把压缩、格式转换、裁剪、GIF、倍速、改尺寸、音频处理开放给 Cursor、Claude Code、Codex 等 AI 工具，也可在终端脚本或自动化流水线中运行。automation 文件夹需与主程序同目录，整体复制程序文件夹即可，无需安装。"/>
+                <Label Content="MCP 服务程序" HorizontalAlignment="Left" Margin="19,112,0,0" VerticalAlignment="Top" FontSize="13" FontWeight="Bold"/>
+                <TextBox x:Name="textBoxAutomationMcpPath" IsReadOnly="True" HorizontalAlignment="Left" Height="30" Margin="24,134,0,0" VerticalAlignment="Top" Width="520" FontSize="12" VerticalContentAlignment="Center"/>
+                <TextBlock x:Name="textBlockAutomationStatus" TextWrapping="Wrap" Width="520" HorizontalAlignment="Left" Margin="24,172,0,0" VerticalAlignment="Top" FontSize="12" Foreground="#2E9E5B"/>
+                <Button Content="复制通用配置" Style="{StaticResource ModernSecondaryButtonStyle}" HorizontalAlignment="Left" Margin="24,200,0,0" VerticalAlignment="Top" Width="150" Height="32" ToolTip="JSON 格式，适用于 Cursor、Trae、WorkBuddy、Cherry Studio 等 mcpServers 结构的客户端" Click="BtnAutomationCopyCursor_Click"/>
+                <Button Content="复制 Claude 配置" Style="{StaticResource ModernSecondaryButtonStyle}" HorizontalAlignment="Left" Margin="184,200,0,0" VerticalAlignment="Top" Width="150" Height="32" Click="BtnAutomationCopyClaude_Click"/>
+                <Button Content="复制 Codex 配置" Style="{StaticResource ModernSecondaryButtonStyle}" HorizontalAlignment="Left" Margin="344,200,0,0" VerticalAlignment="Top" Width="150" Height="32" Click="BtnAutomationCopyCodex_Click"/>
+                <TextBlock TextWrapping="Wrap" Width="520" HorizontalAlignment="Left" Margin="24,240,0,0" VerticalAlignment="Top" FontSize="11" Foreground="#888888"
+                           Text="其他 AI 工具（Trae、WorkBuddy、Cherry Studio 等）也复制第一项。"/>
+                <Button Content="打开自动化目录" Style="{StaticResource ModernSecondaryButtonStyle}" HorizontalAlignment="Left" Margin="24,268,0,0" VerticalAlignment="Top" Width="180" Height="30" Click="BtnAutomationOpenFolder_Click"/>
+                <Button Content="复制 CLI 路径" Style="{StaticResource ModernSecondaryButtonStyle}" HorizontalAlignment="Left" Margin="214,268,0,0" VerticalAlignment="Top" Width="140" Height="30" Click="BtnAutomationCopyCli_Click"/>
+                <Label Content="命令行示例（在 automation 目录下执行，JSON 参数用单引号包住）" HorizontalAlignment="Left" Margin="19,312,0,0" VerticalAlignment="Top" FontSize="13" FontWeight="Bold"/>
+                <TextBox x:Name="textBoxAutomationCommands" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                         HorizontalAlignment="Left" Height="148" Margin="24,338,0,0" VerticalAlignment="Top" Width="520" FontFamily="Consolas" FontSize="11" Background="#F7F7F7" BorderBrush="#E5E5E5"/>
             </Grid>
 
         </Grid>

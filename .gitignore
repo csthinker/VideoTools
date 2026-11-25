@@ -1,3 +1,14 @@
 VideoTools/bin
 VideoTools/obj
+VideoTools.Automation/bin
+VideoTools.Automation/obj
+VideoTools.CLI/bin
+VideoTools.CLI/obj
+VideoTools.MCP/bin
+VideoTools.MCP/obj
 .vs
+.build
+dist
+data/
+*.log
+*.wpftmp.csproj
